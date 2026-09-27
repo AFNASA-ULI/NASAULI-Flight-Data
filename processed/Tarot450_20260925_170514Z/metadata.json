@@ -1,5 +1,5 @@
 {
-  "pipeline_version": "1.2.0",
+  "pipeline_version": "1.2.1",
   "flight_id": "Tarot450_20260925_170514Z",
   "platform": {
     "id": "TAROT_450",
@@ -135,7 +135,7 @@
     },
     {
       "level": "warn",
-      "title": "Logger clock not synchronised",
+      "title": "Logger clock not synchronized",
       "detail": "The header says chrony_synchronised: False; the host clock is 2.07 s behind the autopilot's GPS time. time_gps_utc corrects for this."
     },
     {

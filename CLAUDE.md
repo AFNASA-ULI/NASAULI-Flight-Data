@@ -57,6 +57,6 @@ There is no test suite; validate a change by running `process` on all flights an
   `*_rx_UTC`/`*_Age_ms` giving receive time and staleness.
 - Known logger quirks handled by the pipeline: `HB_Armed` mixes heartbeats from several components (the
   autopilot's have base_mode bit 0 set); the logger writes the magnetometer columns as `IMU_*mag_mT` although
-  the values are milligauss (the committed raw files were relabelled `_mG`); the host clock is not
+  the values are milligauss (the committed raw files were relabeled `_mG`); the host clock is not
   chrony-synced (offset estimated from `SYST_UnixUsec`). v1 logs have several wrong unit labels, documented
   in `readers/legacy_v1.py`.

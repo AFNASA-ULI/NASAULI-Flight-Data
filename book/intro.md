@@ -36,7 +36,7 @@ Everything at once, all cleaned data in one zip, or the data for a single drone.
 ```{include} _generated/overview.md
 ```
 
-## How the data is organised
+## How the data is organized
 
 - **Raw data** is never edited. Each flight has a folder in
   [`raw_data/`](https://github.com/AFNASA-ULI/flightdata/tree/main/raw_data); wind-drone logs are in

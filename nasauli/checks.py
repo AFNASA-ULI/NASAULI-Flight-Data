@@ -138,7 +138,7 @@ def run_checks(s: Session, summary: dict) -> list[dict]:
     # --- clocks
     off = info.get("gps_clock_offset_s")
     if h.get("chrony_synchronised", "").lower() == "false":
-        add("warn", "Logger clock not synchronised",
+        add("warn", "Logger clock not synchronized",
             "The header says chrony_synchronised: False"
             + (f"; the host clock is {abs(off):.2f} s {'behind' if off > 0 else 'ahead of'} the autopilot's GPS time. "
                "time_gps_utc corrects for this." if off is not None else "."))
@@ -180,7 +180,7 @@ def run_checks(s: Session, summary: dict) -> list[dict]:
 
     # --- unit labels
     if any(c.endswith("mag_mT") for c in info["raw_columns"]):
-        add("info", "Magnetometer columns mislabelled",
+        add("info", "Magnetometer columns mislabeled",
             "IMU_*mag_mT holds MAVLink SCALED_IMU values, which are milligauss (Earth's field is ≈500 mG, ≈0.05 mT). "
             "The cleaned data calls them mag_*_mgauss; the logger's column names should be fixed.")
 

@@ -1,5 +1,5 @@
 {
-  "pipeline_version": "1.0.0",
+  "pipeline_version": "1.1.0",
   "flight_id": "Tarot450_20260408",
   "platform": {
     "id": "TAROT_450",
@@ -29,6 +29,8 @@
     "platform_id": "TAROT_450",
     "start_utc": "2026-04-08T16:57:11.937000+00:00",
     "end_utc": "2026-04-08T16:59:51.966000+00:00",
+    "start_local": "2026-04-08T10:57:11.937000-06:00",
+    "end_local": "2026-04-08T10:59:51.966000-06:00",
     "duration_s": 160.0,
     "samples": 2068,
     "sample_rate_hz": 12.92,
@@ -111,6 +113,7 @@
     "motor3_us",
     "motor4_us",
     "throttle_pct",
+    "time_local",
     "vib_x_m_s2",
     "vib_y_m_s2",
     "vib_z_m_s2",
@@ -129,7 +132,8 @@
         "name": "wind_drone_20260925_102813_csv",
         "start_utc": "2026-09-25T16:28:15.725896202+00:00",
         "end_utc": "2026-09-25T16:58:18.928394923+00:00",
-        "rows": 9017
+        "rows": 9017,
+        "bag_closed": false
       }
     ]
   },
@@ -141,6 +145,10 @@
     "time_gps_utc": {
       "unit": "UTC",
       "description": "Sample time corrected to the autopilot's GPS clock"
+    },
+    "time_local": {
+      "unit": "America/Denver",
+      "description": "time_gps_utc in Mountain Time (MST/MDT)"
     },
     "elapsed_s": {
       "unit": "s",

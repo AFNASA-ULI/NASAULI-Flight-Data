@@ -1,5 +1,5 @@
 {
-  "pipeline_version": "1.0.0",
+  "pipeline_version": "1.1.0",
   "flight_id": "Tarot450_20260925_165053Z",
   "platform": {
     "id": "TAROT_450",
@@ -56,6 +56,8 @@
     "platform_id": "TAROT_450",
     "start_utc": "2026-09-25T16:39:58.882000+00:00",
     "end_utc": "2026-09-25T16:50:00.227000+00:00",
+    "start_local": "2026-09-25T10:40:00.989239962-06:00",
+    "end_local": "2026-09-25T10:50:02.334239962-06:00",
     "duration_s": 601.5,
     "samples": 12026,
     "sample_rate_hz": 19.99,
@@ -167,7 +169,8 @@
         "name": "wind_drone_20260925_102813_csv",
         "start_utc": "2026-09-25T16:28:15.725896202+00:00",
         "end_utc": "2026-09-25T16:58:18.928394923+00:00",
-        "rows": 9017
+        "rows": 9017,
+        "bag_closed": false
       }
     ]
   },
@@ -179,6 +182,10 @@
     "time_gps_utc": {
       "unit": "UTC",
       "description": "Sample time corrected to the autopilot's GPS clock"
+    },
+    "time_local": {
+      "unit": "America/Denver",
+      "description": "time_gps_utc in Mountain Time (MST/MDT)"
     },
     "elapsed_s": {
       "unit": "s",
@@ -465,6 +472,10 @@
     "sensor_stamp_utc": {
       "unit": "UTC",
       "description": "Timestamp in the message header, set by the sensor node"
+    },
+    "time_local": {
+      "unit": "America/Denver",
+      "description": "time_utc in Mountain Time (MST/MDT)"
     },
     "elapsed_s": {
       "unit": "s",

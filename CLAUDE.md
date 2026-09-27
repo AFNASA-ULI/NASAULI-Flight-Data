@@ -48,6 +48,10 @@ There is no test suite; validate a change by running `process` on all flights an
 - New drone: add it to `nasauli/platforms.py`.
 - Anything that changes processed outputs: bump `nasauli.__version__`.
 - Generated site pages live only in `_build/`; edit `nasauli/book.py` or `book/`, never the output.
+- Times: data files keep UTC columns plus `time_local`; everything shown to people (site, reports, check
+  messages) is Mountain Time via `nasauli/localtime.py` (America/Denver).
+- Wind bags whose `.mcap` lacks the MCAP end marker were never closed cleanly (possibly cut short); the site
+  and checks flag this.
 - v2 raw logs start with `# key: value` lines ending in `# ---`. Column groups map to MAVLink messages
   (`HB_`, `ATT_`, `IMU_`, `GPS_`/`POS_`, `BAT_`, `VFR_`, `SRV*_us`, `VIB_`, `EKF_`, `BARO_`, `WND_`, ...), with
   `*_rx_UTC`/`*_Age_ms` giving receive time and staleness.

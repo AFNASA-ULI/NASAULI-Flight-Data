@@ -21,6 +21,27 @@ WIND_FILE = "wind_sensor_node__wind.csv"
 TEMP_FILE = "wind_sensor_node__temperature.csv"
 
 
+MCAP_MAGIC = b"\x89MCAP0\r\n"
+
+
+def bag_closed(csv_dir: Path) -> bool | None:
+    """Whether the bag this CSV was exported from was closed cleanly (MCAP files end with the magic bytes).
+
+    A missing end marker means the recorder never finished the file (power loss, killed process, or a copy
+    taken while it was still recording), so the recording may be longer than this file. None if no bag.
+    """
+    bag_dir = csv_dir.with_name(csv_dir.name.removesuffix("_csv"))
+    files = sorted(bag_dir.glob("*.mcap"))
+    if not files:
+        return None
+    for f in files:
+        with open(f, "rb") as fh:
+            fh.seek(max(0, f.stat().st_size - len(MCAP_MAGIC)))
+            if fh.read() != MCAP_MAGIC:
+                return False
+    return True
+
+
 def find(raw_dir: Path) -> list[Path]:
     return sorted(p.parent for p in raw_dir.glob(f"*/{WIND_FILE}"))
 

@@ -48,6 +48,7 @@ page. The remaining raw logger columns follow under their original names.
 - `armed` uses only the autopilot's heartbeats; the raw `HB_Armed` column also contains other MAVLink
   components' heartbeats.
 - `time_gps_utc` is the logger clock corrected to the autopilot's GPS time. Wind data is matched on it.
+  `time_local` is the same instant in Mountain Time (MST/MDT); the website shows Mountain Time throughout.
 - Wind: the sensor's `vector.x` is speed (m/s) and `vector.y` is direction (deg).
 
 ## Log formats

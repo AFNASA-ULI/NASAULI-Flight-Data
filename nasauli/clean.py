@@ -16,6 +16,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .localtime import series_to_local
 from .platforms import platform_for
 from .readers import reader_for, wind_ros2
 
@@ -86,7 +87,8 @@ def trim_wind(wind: pd.DataFrame, flight: pd.DataFrame, margin_s: float = WIND_M
     cut["elapsed_s"] = (
         (cut["time_utc"] - t0).dt.total_seconds() + float(flight["elapsed_s"].iloc[0])
     ).round(3)
-    cut = cut[["time_utc", "sensor_stamp_utc", "elapsed_s", "wind_speed_m_s", "wind_dir_deg",
+    cut["time_local"] = series_to_local(cut["time_utc"])
+    cut = cut[["time_utc", "sensor_stamp_utc", "time_local", "elapsed_s", "wind_speed_m_s", "wind_dir_deg",
                "wind_z", "temperature_c", "source"]].reset_index(drop=True)
 
     flight_s = (t1 - t0).total_seconds()
@@ -116,7 +118,8 @@ def load_wind_logs(root: Path) -> tuple[pd.DataFrame | None, tuple[dict, ...]]:
         w["source"] = d.name
         parts.append(w)
         logs.append({"name": d.name, "start_utc": w["time_utc"].min().isoformat(),
-                     "end_utc": w["time_utc"].max().isoformat(), "rows": int(len(w))})
+                     "end_utc": w["time_utc"].max().isoformat(), "rows": int(len(w)),
+                     "bag_closed": wind_ros2.bag_closed(d)})
     if not parts:
         return None, ()
     return pd.concat(parts).sort_values("time_utc").reset_index(drop=True), tuple(logs)
@@ -127,6 +130,7 @@ def load_session(csv_path: Path, root: Path) -> Session | None:
     if reader is None:
         return None
     df, info = reader.read(csv_path)
+    df["time_local"] = series_to_local(df["time_gps_utc"])
     info["home"] = add_local_position(df)
     h = info["header"]
     info["platform"] = platform_for(h.get("platform"), csv_path.parent.name, h.get("platform_label"))

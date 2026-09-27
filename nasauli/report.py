@@ -57,8 +57,16 @@ def plot_data(df: pd.DataFrame, wind: pd.DataFrame | None) -> dict:
     w = None
     if wind is not None and len(wind):
         w = {"t": _arr(wind["elapsed_s"], 2), "spd": _arr(wind["wind_speed_m_s"], 1),
-             "dir": _arr(wind["wind_dir_deg"], 0), "temp": _arr(wind["temperature_c"], 1)}
+             "dir": _arr(wind["wind_dir_deg"], 0), "temp": _arr(wind["temperature_c"], 1),
+             "mean_spd": round(float(wind["wind_speed_m_s"].mean()), 1),
+             "mean_from": round(circmean(wind["wind_dir_deg"])),
+             "mean_from_name": compass(circmean(wind["wind_dir_deg"]))}
     return {"D": data, "W": w}
+
+
+def compass(deg: float) -> str:
+    names = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+    return names[int((deg % 360) / 22.5 + 0.5) % 16]
 
 
 def circmean(deg: pd.Series) -> float:
@@ -231,13 +239,13 @@ __NOTES__
 </div>
 <div class="bar"><span class="readout" id="readout">Hover a plot to read values.</span><button id="reset" type="button">Reset zoom</button></div>
 <div class="top">
-<section><h2>Ground track</h2><p class="cap">Metres from home, equal scale. Colour is time.</p><div id="p-track" class="plot"></div></section>
+<section><h2>Ground track</h2><p class="cap">Meters from home, equal scale. Color is time.</p><div id="p-track" class="plot"></div></section>
 <div class="stack">
 <section data-plot="p-alt"><h2>Altitude</h2><p class="cap" id="alt-cap">Above takeoff</p><div id="p-alt" class="plot"></div></section>
 <section data-plot="p-gs"><h2>Groundspeed and climb rate</h2><div id="p-gs" class="plot"></div></section>
 </div>
 </div>
-<section style="margin-bottom:14px"><h2>3D trajectory</h2><p class="cap">Metres from home; height relative to takeoff, vertical scale exaggerated. Drag to rotate, scroll to zoom.</p><div id="p-3d" class="plot" style="height:520px"></div></section>
+<section style="margin-bottom:14px"><h2>3D trajectory</h2><p class="cap">Meters from home; height relative to takeoff, vertical scale exaggerated. Drag to rotate, scroll to zoom.</p><div id="p-3d" class="plot" style="height:520px"></div></section>
 <div class="stack">
 __WIND__
 <section data-plot="p-att"><h2>Attitude</h2><p class="cap">Roll and pitch in degrees.</p><div id="p-att" class="plot"></div></section>
@@ -283,6 +291,18 @@ function base(extra){
 const L=(y,name,c,o)=>Object.assign({x:D.t,y,name,type:'scatter',mode:'lines',line:{color:c,width:1.3}},o||{});
 const hmax=Math.max(5,...D.alt.filter(v=>v!==null));
 let xr=null;
+// Mean wind as an arrow in the ground track's top-left corner, pointing downwind (direction is "from").
+function windArrow(){
+  if(!W||W.mean_spd==null)return [];
+  const to=(W.mean_from+180)*Math.PI/180,len=32,col=css('--ink');
+  // Sits in the top margin, left of the plot: arrow (centered on a point 20 px in, 22 px up) then the label.
+  const cx=20,cy=22;
+  return [{xref:'paper',yref:'paper',x:0,y:1,xshift:cx+len/2*Math.sin(to),yshift:cy+len/2*Math.cos(to),
+      ax:-len*Math.sin(to),ay:len*Math.cos(to),axref:'pixel',ayref:'pixel',
+      showarrow:true,arrowhead:2,arrowsize:1.2,arrowwidth:2.5,arrowcolor:col,text:''},
+    {xref:'paper',yref:'paper',x:0,y:1,xshift:44,yshift:cy,xanchor:'left',yanchor:'middle',showarrow:false,
+      text:`<b>Mean wind ${W.mean_spd.toFixed(1)} m/s</b> from ${W.mean_from}° (${W.mean_from_name})`,font:{size:12,color:col}}];
+}
 const PR=(...a)=>Plotly.react(...a);
 function draw(){
   const react=(id,...a)=>{if(document.getElementById(id))return PR(id,...a);};
@@ -293,11 +313,11 @@ function draw(){
   const sel=[];
   if(xr){const i0=D.t.findIndex(t=>t>=xr[0]),i1=D.t.findIndex(t=>t>xr[1]);const j=i1<0?D.t.length:i1;
     if(i0>=0)sel.push({x:D.E.slice(i0,j),y:D.N.slice(i0,j),type:'scatter',mode:'lines',name:'zoomed range',line:{color:c4,width:4},hoverinfo:'skip'});}
-  react('p-track',[tr,home,...sel],{margin:{l:52,r:10,t:10,b:40},paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',
+  react('p-track',[tr,home,...sel],{margin:{l:52,r:10,t:W?50:10,b:40},paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',
     font:{family:'IBM Plex Sans, system-ui, sans-serif',size:12,color:css('--ink')},showlegend:false,
     xaxis:axis({title:{text:'east [m]'}}),yaxis:axis({title:{text:'north [m]'},scaleanchor:'x',scaleratio:1}),
-    hoverlabel:{bgcolor:css('--panel'),bordercolor:css('--rule'),font:{color:css('--ink')}}},cfg);
-  // 3D: one coloured segment per flight-mode run
+    hoverlabel:{bgcolor:css('--panel'),bordercolor:css('--rule'),font:{color:css('--ink')}},annotations:windArrow()},cfg);
+  // 3D: one colored segment per flight-mode run
   const pal=[c1,c2,c3,c4],names=[...new Set(D.mode)],cm={};names.forEach((n,i)=>cm[n]=names.length===1?c1:(n==='—'?css('--muted'):pal[i%4]));
   const mlabel=m=>names.length===1&&m==='—'?'flight path':(m==='—'?'no mode':m);
   const segs=[],seen=new Set();let st=0;

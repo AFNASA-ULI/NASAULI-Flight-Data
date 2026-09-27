@@ -14,6 +14,7 @@ FLIGHT_COLUMNS = {
     # time
     "time_utc": ("UTC", "Logger host clock time of the sample"),
     "time_gps_utc": ("UTC", "Sample time corrected to the autopilot's GPS clock"),
+    "time_local": ("America/Denver", "time_gps_utc in Mountain Time (MST/MDT)"),
     "elapsed_s": ("s", "Time since logging started"),
     "sample_n": ("-", "Sample counter"),
     # state
@@ -100,6 +101,7 @@ FLIGHT_COLUMNS = {
 WIND_COLUMNS = {
     "time_utc": ("UTC", "Time the wind-drone computer received the message (ROS bag time)"),
     "sensor_stamp_utc": ("UTC", "Timestamp in the message header, set by the sensor node"),
+    "time_local": ("America/Denver", "time_utc in Mountain Time (MST/MDT)"),
     "elapsed_s": ("s", "Seconds on the matching flight's elapsed_s axis"),
     "wind_speed_m_s": ("m/s", "Wind speed (vector.x)"),
     "wind_dir_deg": ("deg", "Wind direction (vector.y)"),

@@ -23,6 +23,7 @@ import yaml
 from . import __version__
 from .clean import RAW, WIND_DIR, find_flight_dirs, load_wind_logs
 from .pipeline import PROCESSED, load_all_metadata
+from .localtime import LOCAL_LABEL, fmt
 from .platforms import PLATFORMS
 from .report import render, stat_tiles, title_for
 from .schema import FLIGHT_COLUMNS, WIND_COLUMNS
@@ -57,7 +58,7 @@ def esc(s) -> str:
 
 
 def when(meta: dict) -> str:
-    return f"{pd.Timestamp(meta['summary']['start_utc']):%d %b %Y · %H:%M} UTC"
+    return fmt(meta["summary"]["start_utc"])
 
 
 def page_id(meta: dict) -> str:
@@ -95,7 +96,7 @@ class Book:
         p.write_text(text.strip() + "\n")
 
     def flight_table(self, metas: list[dict], link_prefix: str, drone_col: bool = False) -> str:
-        head = "| Date (UTC) | " + ("Drone | " if drone_col else "") + "Airborne | Max range | Max alt | Wind data | Warnings |"
+        head = f"| Date ({LOCAL_LABEL}) | " + ("Drone | " if drone_col else "") + "Airborne | Max range | Max alt | Wind data | Warnings |"
         sep = "|---|" + ("---|" if drone_col else "") + "---:|---:|---:|---|---:|"
         rows = [head, sep]
         for m in metas:
@@ -193,7 +194,7 @@ class Book:
         by_folder = {m["flight_id"]: m for m in self.metas}
         for pid in self.platform_order:
             ms = self.by_platform[pid]
-            text += [f"## {ms[0]['platform']['label']}", "", "| Flight | Date (UTC) | Files | Size | Format |",
+            text += [f"## {ms[0]['platform']['label']}", "", f"| Flight | Date ({LOCAL_LABEL}) | Files | Size | Format |",
                      "|---|---|---:|---:|---|"]
             for m in ms:
                 files = [f for f in (self.root / RAW / m["flight_id"]).iterdir() if f.is_file()]
@@ -248,13 +249,15 @@ class Book:
                 "Wind speed, direction and temperature from the wind drone's sensor, recorded as ROS 2 bags "
                 f"([raw_data/{WIND_DIR}]({tree(f'{RAW}/{WIND_DIR}')})). The pipeline reads the CSV export of each bag "
                 "and cuts out the part that overlaps each flight, matching on GPS time.", "",
-                "| Log | Start (UTC) | End (UTC) | Rows | Flights covered |", "|---|---|---|---:|---|"]
+                f"| Log | Start ({LOCAL_LABEL}) | End ({LOCAL_LABEL}) | Rows | Recording | Flights covered |",
+                "|---|---|---|---:|---|---|"]
         for lg in logs:
             covered = [m for m in self.metas if m.get("wind") and lg["name"] in m["wind"].get("sources", [])]
             links = ", ".join(f"[{when(m)}](../../experiments/{m['platform']['id']}/{page_id(m)}.md)" for m in covered)
             url = tree(f"{RAW}/{WIND_DIR}/{lg['name']}")
-            text.append(f"| [{lg['name']}]({url}) | {lg['start_utc'][:19].replace('T', ' ')} | "
-                        f"{lg['end_utc'][:19].replace('T', ' ')} | {lg['rows']} | {links or 'none'} |")
+            closed = {True: "complete", False: "⚠️ not closed (file may be cut short)", None: "–"}[lg.get("bag_closed")]
+            text.append(f"| [{lg['name']}]({url}) | {fmt(lg['start_utc'], '%Y-%m-%d %H:%M:%S %Z')} | "
+                        f"{fmt(lg['end_utc'], '%H:%M:%S %Z')} | {lg['rows']} | {closed} | {links or 'none'} |")
         self.write("data/raw/wind_drone.md", "\n".join(text))
 
     # ---------------------------------------------------------------- processed + download
@@ -267,8 +270,9 @@ class Book:
                 "| `wind.parquet`, `wind.csv` | Wind-drone data for the flight's time window (only when a wind log overlaps) |",
                 "| `metadata.json` | Log header, summary numbers, data-quality findings, column units, source file and its SHA-256, pipeline version |",
                 "",
-                "Times are UTC. `time_gps_utc` is the logger's clock corrected to the autopilot's GPS time; wind data is "
-                "matched on this clock. The standard columns have the same names and units for every drone and every log "
+                "`time_utc` is the logger's clock; `time_gps_utc` is that corrected to the autopilot's GPS time, and "
+                "`time_local` is the same instant in Mountain Time (MST/MDT), which the website uses. Wind data is "
+                "matched on GPS time. The standard columns have the same names and units for every drone and every log "
                 "format; a column the log doesn't have is empty.", "",
                 "## Loading", "", "```python", "import pandas as pd",
                 f'df = pd.read_parquet("{raw_url("processed/Tarot450_20260925_165053Z/flight.parquet")}")',

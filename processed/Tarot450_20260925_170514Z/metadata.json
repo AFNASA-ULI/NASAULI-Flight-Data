@@ -1,5 +1,5 @@
 {
-  "pipeline_version": "1.0.0",
+  "pipeline_version": "1.1.0",
   "flight_id": "Tarot450_20260925_170514Z",
   "platform": {
     "id": "TAROT_450",
@@ -54,6 +54,8 @@
     "platform_id": "TAROT_450",
     "start_utc": "2026-09-25T17:01:08.524000+00:00",
     "end_utc": "2026-09-25T17:04:59.733000+00:00",
+    "start_local": "2026-09-25T11:01:10.590302060-06:00",
+    "end_local": "2026-09-25T11:05:01.799302060-06:00",
     "duration_s": 231.2,
     "samples": 4626,
     "sample_rate_hz": 20.0,
@@ -104,7 +106,7 @@
     {
       "level": "warn",
       "title": "No wind data for this flight",
-      "detail": "That day's wind log(s) cover 16:28:15\u201316:58:18 UTC; this flight runs 17:01:10\u201317:05:01 UTC (GPS time)."
+      "detail": "That day's wind log(s) cover 10:28:15\u201310:58:18 MDT; this flight runs 11:01:10\u201311:05:01 (GPS time). The wind bag was not closed cleanly (no MCAP end marker), so the recording probably continued past the end of this file; look for a complete copy on the wind drone."
     },
     {
       "level": "warn",
@@ -156,7 +158,8 @@
         "name": "wind_drone_20260925_102813_csv",
         "start_utc": "2026-09-25T16:28:15.725896202+00:00",
         "end_utc": "2026-09-25T16:58:18.928394923+00:00",
-        "rows": 9017
+        "rows": 9017,
+        "bag_closed": false
       }
     ]
   },
@@ -168,6 +171,10 @@
     "time_gps_utc": {
       "unit": "UTC",
       "description": "Sample time corrected to the autopilot's GPS clock"
+    },
+    "time_local": {
+      "unit": "America/Denver",
+      "description": "time_gps_utc in Mountain Time (MST/MDT)"
     },
     "elapsed_s": {
       "unit": "s",

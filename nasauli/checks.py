@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .clean import Session, airborne, armed_or_unknown
+from .localtime import fmt
 from .schema import FLIGHT_COLUMNS
 
 COMPASS_VAR_WARN = 0.5  # ArduPilot's default EKF failsafe threshold is 0.8
@@ -41,6 +42,8 @@ def summarize(s: Session) -> dict:
         "platform_id": s.info["platform"]["id"],
         "start_utc": df["time_utc"].min().isoformat(),
         "end_utc": df["time_utc"].max().isoformat(),
+        "start_local": df["time_local"].min().isoformat(),
+        "end_local": df["time_local"].max().isoformat(),
         "duration_s": _r(t.max() - t.min()),
         "samples": int(len(df)),
         "sample_rate_hz": _r((len(df) - 1) / (t.max() - t.min()), 2) if len(df) > 1 else None,
@@ -93,13 +96,17 @@ def run_checks(s: Session, summary: dict) -> list[dict]:
     else:
         w = s.wind_info
         if w["rows"] == 0:
-            same_day = [lg for lg in w.get("logs_available", [])
-                        if lg["start_utc"][:10] == w["flight_start_gps_utc"][:10]]
+            day = fmt(w["flight_start_gps_utc"], "%Y-%m-%d")
+            same_day = [lg for lg in w.get("logs_available", []) if fmt(lg["start_utc"], "%Y-%m-%d") == day]
             if same_day:
-                spans = ", ".join(f"{lg['start_utc'][11:19]}–{lg['end_utc'][11:19]}" for lg in same_day)
-                add("warn", "No wind data for this flight",
-                    f"That day's wind log(s) cover {spans} UTC; this flight runs "
-                    f"{w['flight_start_gps_utc'][11:19]}–{w['flight_end_gps_utc'][11:19]} UTC (GPS time).")
+                t = lambda x: fmt(x, "%H:%M:%S")
+                spans = ", ".join(f"{t(lg['start_utc'])}–{t(lg['end_utc'])}" for lg in same_day)
+                detail = (f"That day's wind log(s) cover {spans} {fmt(w['flight_start_gps_utc'], '%Z')}; this flight "
+                          f"runs {t(w['flight_start_gps_utc'])}–{t(w['flight_end_gps_utc'])} (GPS time).")
+                if any(lg.get("bag_closed") is False for lg in same_day):
+                    detail += (" The wind bag was not closed cleanly (no MCAP end marker), so the recording probably "
+                               "continued past the end of this file; look for a complete copy on the wind drone.")
+                add("warn", "No wind data for this flight", detail)
             else:
                 add("info", "No wind data for this flight", "No wind-drone log was recorded on this day.")
         elif w["coverage_pct"] < 99:

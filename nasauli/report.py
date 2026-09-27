@@ -14,6 +14,8 @@ import math
 import numpy as np
 import pandas as pd
 
+from .localtime import fmt, to_local
+
 MAX_PLOT_HZ = 10.0
 
 
@@ -34,7 +36,7 @@ def plot_data(df: pd.DataFrame, wind: pd.DataFrame | None) -> dict:
     d = df.iloc[::step]
     data = {
         "t": _arr(d["elapsed_s"], 2),
-        "utc": [x.strftime("%H:%M:%S.%f")[:-4] if pd.notna(x) else None for x in d["time_gps_utc"]],
+        "local": [x.strftime("%H:%M:%S.%f")[:-4] if pd.notna(x) else None for x in d["time_local"]],
         "E": _arr(d["east_m"], 1), "N": _arr(d["north_m"], 1),
         "alt": _arr(d["alt_rel_m"], 2), "gs": _arr(d["groundspeed_m_s"], 2), "vz": _arr(d["climb_m_s"], 2),
         "roll": _arr(d["roll_deg"], 1), "pitch": _arr(d["pitch_deg"], 1),
@@ -117,25 +119,24 @@ def _notes_html(checks: list[dict]) -> str:
 
 
 def title_for(meta: dict) -> str:
-    start = pd.Timestamp(meta["summary"]["start_utc"])
-    return f"{meta['platform']['label']} flight, {start:%d %b %Y %H:%M} UTC"
+    return f"{meta['platform']['label']} flight, {fmt(meta['summary']['start_utc'], '%d %b %Y %H:%M %Z')}"
 
 
 def render(meta: dict, flight: pd.DataFrame, wind: pd.DataFrame | None,
            downloads: dict[str, str], back_href: str = "../index.html") -> str:
     sm = meta["summary"]
-    start = pd.Timestamp(sm["start_utc"])
-    end = pd.Timestamp(sm["end_utc"])
+    start = to_local(sm["start_utc"])
+    end = to_local(sm["end_utc"])
     has_modes = any(m[2] != "—" for m in sm["modes"])
-    sub = (f"Session <code>{html.escape(sm['session_id'])}</code>, {start:%d %b %Y}, UTC "
-           f"{start:%H:%M:%S} to {end:%H:%M:%S} ({sm['duration_s']:.0f} s at {sm['sample_rate_hz']:.0f} Hz). "
+    sub = (f"Session <code>{html.escape(sm['session_id'])}</code>, {start:%d %b %Y}, "
+           f"{start:%H:%M:%S} to {end:%H:%M:%S} {start:%Z} ({sm['duration_s']:.0f} s at {sm['sample_rate_hz']:.0f} Hz). "
            + ("Shaded bands are AUTO mode. " if has_modes else "")
            + "Zoom any time plot and the others follow; the time range you zoom to is highlighted on the ground track.")
     dl = " · ".join(f'<a href="{html.escape(href)}">{html.escape(label)}</a>' for label, href in downloads.items())
     footer = (f"Generated from <code>{html.escape(meta['source']['file'])}</code> "
               f"({html.escape(meta['header'].get('format', ''))}) by the nasauli pipeline "
               f"v{meta['pipeline_version']}, reader <code>{meta['reader']}</code>. Time axis is "
-              f"<code>elapsed_s</code>; hover times are GPS-corrected UTC.")
+              f"<code>elapsed_s</code>; hover times are GPS-corrected Mountain Time.")
     wind_section = ""
     if wind is not None and len(wind):
         wind_section = ('<section data-plot="p-wind"><h2>Wind sensor</h2><p class="cap">Wind drone, speed (left axis) '
@@ -324,7 +325,7 @@ function hook(){
       else if(ev['xaxis.autorange'])xr=null; else return;
       busy=true;draw();busy=false;});
     el.on('plotly_hover',ev=>{const i=nearest(D.t,ev.points[0].x);
-      let s=`t ${D.t[i].toFixed(2)} s | UTC ${D.utc[i]} | ${D.mode[i]} | alt ${D.alt[i]} m | gs ${D.gs[i]} m/s | ${D.V[i]} V ${D.I[i]} A | ${D.mah[i]} mAh | sats ${D.sats[i]} hdop ${D.hdop[i]}`;
+      let s=`t ${D.t[i].toFixed(2)} s | ${D.local[i]} | ${D.mode[i]} | alt ${D.alt[i]} m | gs ${D.gs[i]} m/s | ${D.V[i]} V ${D.I[i]} A | ${D.mah[i]} mAh | sats ${D.sats[i]} hdop ${D.hdop[i]}`;
       if(W&&W.t.length){const j=nearest(W.t,D.t[i]);if(Math.abs(W.t[j]-D.t[i])<1)s+=` | wind ${W.spd[j]} m/s @ ${W.dir[j]}°`;}
       document.getElementById('readout').textContent=s;});
   });

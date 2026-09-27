@@ -29,7 +29,12 @@ def _write_table(df: pd.DataFrame, base: Path) -> None:
     csv = df.copy()
     for c in csv.columns:
         if isinstance(csv[c].dtype, pd.DatetimeTZDtype):
-            csv[c] = csv[c].dt.strftime("%Y-%m-%dT%H:%M:%S.%f").str[:-3] + "Z"
+            if str(csv[c].dt.tz) == "UTC":
+                csv[c] = csv[c].dt.strftime("%Y-%m-%dT%H:%M:%S.%f").str[:-3] + "Z"
+            else:  # local time: keep the UTC offset, e.g. 2026-09-25T10:39:58.882-06:00
+                off = csv[c].dt.strftime("%z")
+                csv[c] = (csv[c].dt.strftime("%Y-%m-%dT%H:%M:%S.%f").str[:-3]
+                          + off.str[:3] + ":" + off.str[3:])
     csv.to_csv(base.with_suffix(".csv"), index=False)
 
 

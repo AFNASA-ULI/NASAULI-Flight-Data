@@ -3,7 +3,7 @@
 Flight test data from the NASA University Leadership Initiative data collection, with wind data recorded
 alongside the flights.
 
-**Website:** https://afnasa-uli.github.io/NASAULI-Flight-Data/. It has experiments by drone and date with
+**Website:** https://afnasa-uli.github.io/flightdata/. It has experiments by drone and date with
 interactive plots, raw-data browsing, and downloads (everything, all processed data, or per drone).
 
 ## Layout

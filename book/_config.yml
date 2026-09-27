@@ -12,7 +12,7 @@ execute:
   execute_notebooks: "off"
 
 repository:
-  url: https://github.com/AFNASA-ULI/NASAULI-Flight-Data
+  url: https://github.com/AFNASA-ULI/flightdata
   branch: main
 
 html:
@@ -28,7 +28,7 @@ sphinx:
     myst_heading_anchors: 3
     html_theme_options:
       show_navbar_depth: 1
-      repository_url: https://github.com/AFNASA-ULI/NASAULI-Flight-Data
+      repository_url: https://github.com/AFNASA-ULI/flightdata
       use_repository_button: true
       use_issues_button: true
 

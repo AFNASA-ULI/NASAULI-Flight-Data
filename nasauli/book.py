@@ -27,7 +27,7 @@ from .platforms import PLATFORMS
 from .report import render, stat_tiles, title_for
 from .schema import FLIGHT_COLUMNS, WIND_COLUMNS
 
-REPO = "https://github.com/AFNASA-ULI/NASAULI-Flight-Data"
+REPO = "https://github.com/AFNASA-ULI/flightdata"
 BRANCH = "main"
 
 

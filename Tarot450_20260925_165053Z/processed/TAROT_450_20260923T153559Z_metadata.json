@@ -1,0 +1,474 @@
+{
+  "pipeline_version": "1.0.0",
+  "reader": "session_v2",
+  "source": {
+    "file": "TAROT_450_20260923T153559Z.csv",
+    "sha256": "82b8bd0c3ee2e6d35651fc6c18bd4b80fbfab08db31e52bad4aa3c52f3215280"
+  },
+  "header": {
+    "format": "nasauli session log v2.0.0",
+    "format_version": "2.0.0",
+    "session_id": "TAROT_450_20260923T153559Z",
+    "platform": "TAROT_450",
+    "platform_label": "Tarot 450 (quad)",
+    "mode": "flight",
+    "start_utc": "2026-09-25T16:39:57.366Z",
+    "sample_rate_hz_target": "20.0",
+    "operator": "",
+    "location": "",
+    "factorial_condition": "",
+    "replicate": "",
+    "commanded_altitude_m": "",
+    "commanded_speed_ms": "",
+    "adc_enabled": "False",
+    "temp_enabled": "True",
+    "mavlink_enabled": "True",
+    "time_base": "system UTC disciplined by chrony (ground-station peer)",
+    "hostname": "bumblebee",
+    "notes": "",
+    "chrony_reference_id": "00000000 ()",
+    "chrony_stratum": "0",
+    "chrony_last_offset_s": "+0.000000000 seconds",
+    "chrony_synchronised": "False",
+    "i2c_unavailable": "temp",
+    "mavlink_connected": "True",
+    "mavlink_target_system": "1",
+    "mavlink_groups": "core,power,flight,quality,wind"
+  },
+  "summary": {
+    "session_id": "TAROT_450_20260923T153559Z",
+    "platform": "Tarot 450 (quad)",
+    "start_utc": "2026-09-25T16:39:58.882000+00:00",
+    "end_utc": "2026-09-25T16:50:00.227000+00:00",
+    "duration_s": 601.5,
+    "samples": 12026,
+    "sample_rate_hz": 19.99,
+    "modes": [
+      [
+        0.0,
+        38.0,
+        "POSHOLD"
+      ],
+      [
+        38.0,
+        544.85,
+        "AUTO"
+      ],
+      [
+        544.85,
+        595.4,
+        "RTL"
+      ],
+      [
+        595.4,
+        601.45,
+        "POSHOLD"
+      ]
+    ],
+    "takeoff_s": 30.6,
+    "landing_s": 594.4,
+    "airborne_s": 563.8,
+    "landed_in_log": true,
+    "max_alt_rel_m": 25.6,
+    "max_range_m": 379.0,
+    "cruise_alt_m": 25.0,
+    "cruise_speed_m_s": 5.0,
+    "cruise_current_a": 10.1,
+    "mission_items": 8,
+    "rtl_s": 544.9,
+    "batt_consumed_mah": 1648.0,
+    "batt_v_start": 16.56,
+    "batt_v_end": 13.76,
+    "batt_v_end_at_rest": false
+  },
+  "checks": [
+    {
+      "level": "warn",
+      "title": "Logger clock not synchronised",
+      "detail": "The header says chrony_synchronised: False; the host clock is 2.11 s behind the autopilot's GPS time. time_gps_utc corrects for this."
+    },
+    {
+      "level": "warn",
+      "title": "Real-time clock (RTC) not set",
+      "detail": "RTC_UTC reads 2026-04-01 14:44:01, but the flight is on 2026-09-25."
+    },
+    {
+      "level": "warn",
+      "title": "Session ID date doesn't match the start time",
+      "detail": "session_id is TAROT_450_20260923T153559Z, but start_utc is 2026-09-25T16:39:57.366Z. The logger probably reused an old session ID."
+    },
+    {
+      "level": "warn",
+      "title": "High compass variance",
+      "detail": "EKF compass variance peaks at 0.98 (t = 291.4 s). ArduPilot's default failsafe threshold is 0.8."
+    },
+    {
+      "level": "warn",
+      "title": "Weak GPS in flight",
+      "detail": "Minimum 12 satellites, maximum HDOP 2.05 while airborne."
+    },
+    {
+      "level": "info",
+      "title": "HB_Armed mixes heartbeats from several MAVLink components",
+      "detail": "The raw HB_Armed column flips 1178 times. The cleaned armed column only uses autopilot heartbeats (base_mode bit 0 set) and changes 1 time. The logger should filter heartbeats to the autopilot's sysid/compid."
+    },
+    {
+      "level": "info",
+      "title": "Magnetometer columns mislabelled",
+      "detail": "IMU_*mag_mT holds MAVLink SCALED_IMU values, which are milligauss (Earth's field is \u2248500 mG, \u22480.05 mT). The cleaned data calls them mag_*_mgauss; the logger's column names should be fixed."
+    },
+    {
+      "level": "info",
+      "title": "Empty columns",
+      "detail": "23 column(s) have no data: BAT_Cell2_V, BAT_Cell3_V, BAT_Cell4_V, BAT_Temp_cdegC, BAT_TimeRemaining_s, ESC1_RPM, ESC2_RPM, ESC3_RPM, ESC4_RPM, ESC1_V, ESC2_V, ESC3_V, ESC4_V, ESC1_A, ESC2_A, ESC3_A, ESC4_A, ESC1_degC, ESC2_degC, ESC3_degC, ESC4_degC, ESC_rx_UTC, ESC_Age_ms"
+    },
+    {
+      "level": "info",
+      "title": "Autopilot wind estimate is constant",
+      "detail": "WND_* stays at speed 0.0, direction -180.0 for the whole log."
+    },
+    {
+      "level": "info",
+      "title": "Logger skipped samples",
+      "detail": "4 scheduled sample slot(s) were skipped."
+    }
+  ],
+  "home": {
+    "lat_deg": 39.0187668,
+    "lon_deg": -104.8934909
+  },
+  "gps_clock_offset_s": 2.1072,
+  "missing_columns": [
+    "batt_temp_c"
+  ],
+  "wind": {
+    "wind_log_start_utc": "2026-09-25T16:28:15.725896202+00:00",
+    "wind_log_end_utc": "2026-09-25T16:58:18.928394923+00:00",
+    "flight_start_gps_utc": "2026-09-25T16:40:00.989239962+00:00",
+    "flight_end_gps_utc": "2026-09-25T16:50:02.334239962+00:00",
+    "margin_s": 5.0,
+    "rows": 3057,
+    "coverage_pct": 100.0,
+    "sources": [
+      "wind_drone_20260925_102813_csv"
+    ],
+    "reader": "wind_ros2_csv"
+  },
+  "columns": {
+    "time_utc": {
+      "unit": "UTC",
+      "description": "Logger host clock time of the sample"
+    },
+    "time_gps_utc": {
+      "unit": "UTC",
+      "description": "Sample time corrected to the autopilot's GPS clock"
+    },
+    "elapsed_s": {
+      "unit": "s",
+      "description": "Time since logging started"
+    },
+    "sample_n": {
+      "unit": "-",
+      "description": "Sample counter"
+    },
+    "armed": {
+      "unit": "bool",
+      "description": "Autopilot armed, from autopilot heartbeats only"
+    },
+    "flight_mode": {
+      "unit": "-",
+      "description": "Autopilot flight mode name"
+    },
+    "mission_seq": {
+      "unit": "-",
+      "description": "Current mission item"
+    },
+    "wp_dist_m": {
+      "unit": "m",
+      "description": "Distance to current waypoint"
+    },
+    "roll_deg": {
+      "unit": "deg",
+      "description": "Roll angle"
+    },
+    "pitch_deg": {
+      "unit": "deg",
+      "description": "Pitch angle"
+    },
+    "yaw_deg": {
+      "unit": "deg",
+      "description": "Yaw angle"
+    },
+    "roll_rate_deg_s": {
+      "unit": "deg/s",
+      "description": "Roll rate"
+    },
+    "pitch_rate_deg_s": {
+      "unit": "deg/s",
+      "description": "Pitch rate"
+    },
+    "yaw_rate_deg_s": {
+      "unit": "deg/s",
+      "description": "Yaw rate"
+    },
+    "lat_deg": {
+      "unit": "deg",
+      "description": "Latitude (EKF)"
+    },
+    "lon_deg": {
+      "unit": "deg",
+      "description": "Longitude (EKF)"
+    },
+    "alt_msl_m": {
+      "unit": "m",
+      "description": "Altitude above mean sea level (EKF)"
+    },
+    "alt_rel_m": {
+      "unit": "m",
+      "description": "Altitude relative to home (EKF)"
+    },
+    "vel_n_m_s": {
+      "unit": "m/s",
+      "description": "Velocity north"
+    },
+    "vel_e_m_s": {
+      "unit": "m/s",
+      "description": "Velocity east"
+    },
+    "vel_d_m_s": {
+      "unit": "m/s",
+      "description": "Velocity down"
+    },
+    "heading_deg": {
+      "unit": "deg",
+      "description": "Heading"
+    },
+    "north_m": {
+      "unit": "m",
+      "description": "Position north of home"
+    },
+    "east_m": {
+      "unit": "m",
+      "description": "Position east of home"
+    },
+    "gps_lat_deg": {
+      "unit": "deg",
+      "description": "Latitude (raw GPS)"
+    },
+    "gps_lon_deg": {
+      "unit": "deg",
+      "description": "Longitude (raw GPS)"
+    },
+    "gps_alt_m": {
+      "unit": "m",
+      "description": "Altitude MSL (raw GPS)"
+    },
+    "gps_speed_m_s": {
+      "unit": "m/s",
+      "description": "Ground speed (raw GPS)"
+    },
+    "gps_course_deg": {
+      "unit": "deg",
+      "description": "Course over ground (raw GPS)"
+    },
+    "gps_sats": {
+      "unit": "-",
+      "description": "Satellites used"
+    },
+    "gps_fix_type": {
+      "unit": "-",
+      "description": "GPS fix type (3 = 3D)"
+    },
+    "gps_hdop": {
+      "unit": "-",
+      "description": "Horizontal dilution of precision"
+    },
+    "gps_vdop": {
+      "unit": "-",
+      "description": "Vertical dilution of precision"
+    },
+    "groundspeed_m_s": {
+      "unit": "m/s",
+      "description": "Ground speed"
+    },
+    "airspeed_m_s": {
+      "unit": "m/s",
+      "description": "Airspeed (estimated on a multirotor)"
+    },
+    "climb_m_s": {
+      "unit": "m/s",
+      "description": "Climb rate"
+    },
+    "throttle_pct": {
+      "unit": "%",
+      "description": "Throttle"
+    },
+    "acc_x_m_s2": {
+      "unit": "m/s^2",
+      "description": "Accelerometer X"
+    },
+    "acc_y_m_s2": {
+      "unit": "m/s^2",
+      "description": "Accelerometer Y"
+    },
+    "acc_z_m_s2": {
+      "unit": "m/s^2",
+      "description": "Accelerometer Z"
+    },
+    "gyro_x_rad_s": {
+      "unit": "rad/s",
+      "description": "Gyro X"
+    },
+    "gyro_y_rad_s": {
+      "unit": "rad/s",
+      "description": "Gyro Y"
+    },
+    "gyro_z_rad_s": {
+      "unit": "rad/s",
+      "description": "Gyro Z"
+    },
+    "mag_x_mgauss": {
+      "unit": "mgauss",
+      "description": "Magnetometer X"
+    },
+    "mag_y_mgauss": {
+      "unit": "mgauss",
+      "description": "Magnetometer Y"
+    },
+    "mag_z_mgauss": {
+      "unit": "mgauss",
+      "description": "Magnetometer Z"
+    },
+    "batt_voltage_v": {
+      "unit": "V",
+      "description": "Battery voltage"
+    },
+    "batt_current_a": {
+      "unit": "A",
+      "description": "Battery current"
+    },
+    "batt_consumed_mah": {
+      "unit": "mAh",
+      "description": "Charge consumed"
+    },
+    "batt_remaining_pct": {
+      "unit": "%",
+      "description": "Battery remaining (autopilot estimate)"
+    },
+    "batt_temp_c": {
+      "unit": "degC",
+      "description": "Battery temperature (logger's own sensor)"
+    },
+    "motor1_us": {
+      "unit": "us",
+      "description": "Servo/motor output 1"
+    },
+    "motor2_us": {
+      "unit": "us",
+      "description": "Servo/motor output 2"
+    },
+    "motor3_us": {
+      "unit": "us",
+      "description": "Servo/motor output 3"
+    },
+    "motor4_us": {
+      "unit": "us",
+      "description": "Servo/motor output 4"
+    },
+    "vib_x_m_s2": {
+      "unit": "m/s^2",
+      "description": "Vibration X"
+    },
+    "vib_y_m_s2": {
+      "unit": "m/s^2",
+      "description": "Vibration Y"
+    },
+    "vib_z_m_s2": {
+      "unit": "m/s^2",
+      "description": "Vibration Z"
+    },
+    "clip_0": {
+      "unit": "count",
+      "description": "Accelerometer 0 clipping events"
+    },
+    "clip_1": {
+      "unit": "count",
+      "description": "Accelerometer 1 clipping events"
+    },
+    "clip_2": {
+      "unit": "count",
+      "description": "Accelerometer 2 clipping events"
+    },
+    "ekf_flags": {
+      "unit": "-",
+      "description": "EKF status flags"
+    },
+    "ekf_vel_var": {
+      "unit": "-",
+      "description": "EKF velocity variance"
+    },
+    "ekf_pos_horiz_var": {
+      "unit": "-",
+      "description": "EKF horizontal position variance"
+    },
+    "ekf_pos_vert_var": {
+      "unit": "-",
+      "description": "EKF vertical position variance"
+    },
+    "ekf_compass_var": {
+      "unit": "-",
+      "description": "EKF compass variance"
+    },
+    "baro_press_hpa": {
+      "unit": "hPa",
+      "description": "Barometric pressure"
+    },
+    "baro_temp_c": {
+      "unit": "degC",
+      "description": "Barometer temperature"
+    },
+    "ap_wind_dir_deg": {
+      "unit": "deg",
+      "description": "Autopilot wind estimate, direction"
+    },
+    "ap_wind_speed_m_s": {
+      "unit": "m/s",
+      "description": "Autopilot wind estimate, speed"
+    },
+    "ap_wind_speed_z_m_s": {
+      "unit": "m/s",
+      "description": "Autopilot wind estimate, vertical speed"
+    }
+  },
+  "wind_columns": {
+    "time_utc": {
+      "unit": "UTC",
+      "description": "Time the wind-drone computer received the message (ROS bag time)"
+    },
+    "sensor_stamp_utc": {
+      "unit": "UTC",
+      "description": "Timestamp in the message header, set by the sensor node"
+    },
+    "elapsed_s": {
+      "unit": "s",
+      "description": "Seconds on the matching flight's elapsed_s axis"
+    },
+    "wind_speed_m_s": {
+      "unit": "m/s",
+      "description": "Wind speed (vector.x)"
+    },
+    "wind_dir_deg": {
+      "unit": "deg",
+      "description": "Wind direction (vector.y)"
+    },
+    "wind_z": {
+      "unit": "-",
+      "description": "vector.z (unused by the sensor, always 0 so far)"
+    },
+    "temperature_c": {
+      "unit": "degC",
+      "description": "Wind sensor temperature"
+    }
+  },
+  "notes": "Columns not listed under 'columns' are raw logger columns carried through unchanged."
+}

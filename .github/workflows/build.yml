@@ -1,0 +1,72 @@
+name: Build data and website
+
+# On every push to main that touches raw data, the pipeline or the website:
+#   1. raw_data/ -> processed/ for every flight
+#   2. commit any changed processed/ files back to main
+#   3. build the Jupyter Book website and deploy it to GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths:
+      - "raw_data/**"
+      - "nasauli/**"
+      - "book/**"
+      - "notebooks/**"
+      - "requirements*.txt"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt -r requirements-site.txt
+
+      - name: Process raw data
+        run: python -m nasauli process
+
+      - name: Commit processed data
+        run: |
+          git add -A -- processed
+          if git diff --cached --quiet; then
+            echo "processed/ is up to date"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Update processed flight data"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+
+      - name: Build website
+        run: python -m nasauli site --out _site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

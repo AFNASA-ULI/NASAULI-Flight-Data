@@ -1,0 +1,4 @@
+# Pinned so processed outputs are reproducible; bump deliberately (and bump nasauli.__version__).
+numpy==2.4.6
+pandas==3.0.6
+pyarrow==25.0.1

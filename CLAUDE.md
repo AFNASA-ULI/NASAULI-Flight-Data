@@ -4,60 +4,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository purpose
 
-This is a **data repository**, not a codebase. It stores flight telemetry logs collected from a Tarot 450
-quadcopter as part of the NASA ULI (University Leadership Initiative) data collection effort. There is no
-application code, build system, linter, or test suite here — do not invent one. Work in this repo consists
-of adding, renaming, organizing, or reviewing/fixing CSV/XLSX flight-log data.
+A public **data repository** for NASA ULI flight telemetry (Tarot 450 quadcopter so far; more drones to come),
+plus a Python package (`nasauli/`) that turns the raw logs into cleaned data and a Jupyter Book website
+published on GitHub Pages. See README.md for the user-facing description.
 
-Logs are offloaded from an onboard Raspberry Pi (`cubelink/pizero2`) that runs the logger and streams
-telemetry over MAVLink from the flight controller.
+Logs are offloaded from an onboard Raspberry Pi that runs the logger and streams telemetry over MAVLink from
+the flight controller. Wind data comes from a separate "wind drone" that records ROS 2 bags.
 
-## Directory/naming conventions
+## Layout
 
-Each flight session lives in its own top-level folder. Two naming schemes exist in history:
+```
+raw_data/<flight>/            original flight logs (one folder per flight, named <Drone>_<UTC offload time>)
+raw_data/wind_drone/          wind-drone bags + *_csv exports; one log can cover several flights
+processed/<flight>/           flight/wind .parquet+.csv, metadata.json; generated, never edit by hand
+nasauli/readers/              one module per raw format -> standard schema (nasauli/schema.py)
+nasauli/platforms.py          drone registry (website groups experiments by drone)
+nasauli/clean.py              local position, wind matching (on GPS-corrected time), airborne detection
+nasauli/checks.py             summary numbers + data-quality findings
+nasauli/pipeline.py           raw_data -> processed
+nasauli/report.py             per-flight interactive Plotly page (embedded in the site via iframe)
+nasauli/book.py               generates the Jupyter Book pages + _toc.yml, builds the site, zips downloads
+book/                         hand-written site pages (intro.md, contributing.md), _config.yml, _static/
+.github/workflows/build.yml   on push to main: process, commit processed/, build site, deploy Pages
+```
 
-- `Tarot450_<UTC session folder timestamp>` (current), e.g. `Tarot450_20260925_165053Z`
-- Bare UTC timestamp folders (older/retired), e.g. `20260923_154237Z`
+## Commands
 
-Inside a session folder, the CSV filename typically encodes the actual session start time, e.g.
-`TAROT_450_20260925T165912Z.csv`, which usually differs from the folder's timestamp (folder = when the
-file was offloaded/downloaded; filename = when the session/recording started).
+```bash
+pip install -r requirements.txt -r requirements-site.txt
+python -m nasauli process [raw_data/FLIGHT ...]   # all flights by default
+python -m nasauli site --out _site                # Jupyter Book build; generated sources in _build/book
+```
 
-A folder may also contain an `offload_manifest_<timestamp>.json` describing the download/verification
-(source host/path, file size, sha256 checksum match) from when the file was pulled off the Pi — treat this
-as provenance metadata for the CSV(s) in the same folder, not something to edit.
+There is no test suite; validate a change by running `process` on all flights and checking the output
+(row counts, metadata checks), then `site`, and look at the pages.
 
-A `_Fixed.csv` / `_Fixed.xlsx` file alongside a raw CSV (see `Tarot450_20260408/`) is a cleaned/corrected
-version of the same session (e.g. reformatted numeric fields) — do not assume it is a from-scratch export;
-diff against the original before making further edits.
+## Conventions
 
-## Data formats
-
-There are two generations of log schema present in this repo; check the file before assuming a layout.
-
-**v1 (older, e.g. `Tarot450_20260408/*.csv`)**: no header preamble, comma-separated columns start on line 1
-directly with a header row (`Min-Sec, RTC_UTC, GPS_UTC, GPS_Synced, Battery_Temp_C, ...`). Values are often
-padded with spaces for alignment. Column groups: `Battery_*`, `PM_*` (power module), `IMU_*` (roll/pitch/yaw,
-rates, accel, gyro, mag), `RawGPS_*`, `FusedGPS_*`.
-
-**v2 (current, "nasauli session log v2.0.0", e.g. `Tarot450_2026092*` folders)**: file begins with a block of
-`# key: value` comment lines (session_id, platform, mode, start_utc, sample_rate_hz_target, operator,
-location, factorial_condition, replicate, commanded_altitude_m/speed_ms, sensor-enabled flags, time-sync/chrony
-info, hostname, mavlink connection info) terminated by a `# ---` line, followed by the real CSV header and
-data rows. Column groups map to MAVLink message types: `HB_*` (heartbeat), `ATT_*` (attitude), `IMU_*`,
-`RIMU_*` (raw IMU), `GPS_*`/`POS_*`, `SYST_*`, `BAT_*`/`SYS_*`/`PWR_*` (power), `ESC*_*`, `VFR_*`, `SRV*_us`
-(servo outputs), `RC*_us` (RC input), `NAV_*`, `MIS_*` (mission), `VIB_*` (vibration), `EKF_*`, `BARO_*`,
-`WND_*` (wind), plus `MAV_FlightMode`. Each `*_rx_UTC`/`*_Age_ms` pair records when that MAVLink message was
-last received and how stale it was relative to the sample row.
-
-When editing or generating v2 CSVs, preserve the `# ---`-delimited metadata preamble — downstream tooling
-(outside this repo) may rely on it to identify session config, not just the column header row.
-
-## Working in this repo
-
-- Prefer keeping raw/original offloaded files untouched; put corrections in a new `_Fixed` file next to the
-  original rather than overwriting it, matching existing convention.
-- Session folders and manifests double as a chain-of-custody record (checksums, source path/host); don't
-  delete or rewrite manifest JSON files casually.
-- There is no CI, build, or test command to run after changes — validation here means confirming the CSV
-  parses correctly and column counts/order match the header row.
+- Don't modify files under `raw_data/` unless the user asks for a specific correction. Fixes normally belong
+  in the reader or the cleaning step. `*_Fixed.csv` files are hand-edited copies and are not read.
+- New logger format: add `nasauli/readers/<name>.py` (`NAME`, `sniff`, `read`) and register it in
+  `readers/__init__.py`; keep the old readers. The v2 reader looks columns up by name.
+- New drone: add it to `nasauli/platforms.py`.
+- Anything that changes processed outputs: bump `nasauli.__version__`.
+- Generated site pages live only in `_build/`; edit `nasauli/book.py` or `book/`, never the output.
+- v2 raw logs start with `# key: value` lines ending in `# ---`. Column groups map to MAVLink messages
+  (`HB_`, `ATT_`, `IMU_`, `GPS_`/`POS_`, `BAT_`, `VFR_`, `SRV*_us`, `VIB_`, `EKF_`, `BARO_`, `WND_`, ...), with
+  `*_rx_UTC`/`*_Age_ms` giving receive time and staleness.
+- Known logger quirks handled by the pipeline: `HB_Armed` mixes heartbeats from several components (the
+  autopilot's have base_mode bit 0 set); the logger writes the magnetometer columns as `IMU_*mag_mT` although
+  the values are milligauss (the committed raw files were relabelled `_mG`); the host clock is not
+  chrony-synced (offset estimated from `SYST_UnixUsec`). v1 logs have several wrong unit labels, documented
+  in `readers/legacy_v1.py`.

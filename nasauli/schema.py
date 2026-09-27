@@ -47,7 +47,7 @@ FLIGHT_COLUMNS = {
     "gps_speed_m_s": ("m/s", "Ground speed (raw GPS)"),
     "gps_course_deg": ("deg", "Course over ground (raw GPS)"),
     "gps_sats": ("-", "Satellites used"),
-    "gps_fix_type": ("-", "GPS fix type (3 = 3D)"),
+    "gps_fix_type": ("-", "MAVLink GPS fix type: 3 = 3D, 4 = DGPS, 5 = RTK Float, 6 = RTK Fixed"),
     "gps_hdop": ("-", "Horizontal dilution of precision"),
     "gps_vdop": ("-", "Vertical dilution of precision"),
     # VFR HUD
@@ -96,6 +96,20 @@ FLIGHT_COLUMNS = {
     "ap_wind_dir_deg": ("deg", "Autopilot wind estimate, direction"),
     "ap_wind_speed_m_s": ("m/s", "Autopilot wind estimate, speed"),
     "ap_wind_speed_z_m_s": ("m/s", "Autopilot wind estimate, vertical speed"),
+}
+
+# MAVLink GPS_FIX_TYPE -> (name, typical horizontal accuracy). The accuracies are rules of thumb for
+# a multirotor in open sky, not guarantees; the actual error also depends on satellites, HDOP and multipath.
+GPS_FIX_TYPES = {
+    0: ("No GPS", None),
+    1: ("No fix", None),
+    2: ("2D fix", "> 5 m"),
+    3: ("3D fix", "~2–5 m"),
+    4: ("DGPS/SBAS", "~0.5–2 m"),
+    5: ("RTK Float", "~0.2–1 m"),
+    6: ("RTK Fixed", "~1–2 cm"),
+    7: ("Static", None),
+    8: ("PPP", "~0.1 m"),
 }
 
 WIND_COLUMNS = {

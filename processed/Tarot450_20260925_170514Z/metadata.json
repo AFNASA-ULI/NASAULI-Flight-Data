@@ -1,5 +1,5 @@
 {
-  "pipeline_version": "1.1.0",
+  "pipeline_version": "1.2.0",
   "flight_id": "Tarot450_20260925_170514Z",
   "platform": {
     "id": "TAROT_450",
@@ -100,7 +100,32 @@
     "batt_consumed_mah": 559.0,
     "batt_v_start": 16.51,
     "batt_v_end": 15.67,
-    "batt_v_end_at_rest": true
+    "batt_v_end_at_rest": true,
+    "gps": {
+      "basis": "airborne",
+      "sats_min": 15.0,
+      "hdop_max": 1.01,
+      "fix": [
+        {
+          "type": 6,
+          "name": "RTK Fixed",
+          "accuracy": "~1\u20132 cm",
+          "pct": 92.0
+        },
+        {
+          "type": 5,
+          "name": "RTK Float",
+          "accuracy": "~0.2\u20131 m",
+          "pct": 7.0
+        },
+        {
+          "type": 4,
+          "name": "DGPS/SBAS",
+          "accuracy": "~0.5\u20132 m",
+          "pct": 1.0
+        }
+      ]
+    }
   },
   "checks": [
     {
@@ -137,6 +162,11 @@
       "level": "info",
       "title": "Autopilot wind estimate is constant",
       "detail": "WND_* stays at speed 0.0, direction -180.0 for the whole log."
+    },
+    {
+      "level": "info",
+      "title": "RTK fix not held for the whole flight",
+      "detail": "RTK Fixed (~1\u20132 cm) for 92% of the airborne time; the rest was RTK Float 7% (~0.2\u20131 m); DGPS/SBAS 1% (~0.5\u20132 m). Positions in those stretches are less accurate; the GPS panel shows when."
     }
   ],
   "home": {
@@ -290,7 +320,7 @@
     },
     "gps_fix_type": {
       "unit": "-",
-      "description": "GPS fix type (3 = 3D)"
+      "description": "MAVLink GPS fix type: 3 = 3D, 4 = DGPS, 5 = RTK Float, 6 = RTK Fixed"
     },
     "gps_hdop": {
       "unit": "-",

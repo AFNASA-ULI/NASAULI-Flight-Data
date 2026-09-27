@@ -1,4 +1,4 @@
-"""raw_data/ -> processed/ for each flight folder."""
+"""raw_data/<flight>/ -> processed/<flight>/ (flight + wind tables as Parquet and CSV, metadata.json)."""
 
 from __future__ import annotations
 
@@ -10,8 +10,7 @@ import pandas as pd
 
 from . import __version__
 from .checks import run_checks, summarize
-from .clean import Session, find_flight_dirs, load_session, raw_logs
-from .report import render
+from .clean import RAW, Session, find_flight_dirs, load_session, raw_logs
 from .schema import FLIGHT_COLUMNS, WIND_COLUMNS
 
 PROCESSED = "processed"
@@ -30,43 +29,47 @@ def _write_table(df: pd.DataFrame, base: Path) -> None:
     csv = df.copy()
     for c in csv.columns:
         if isinstance(csv[c].dtype, pd.DatetimeTZDtype):
-            csv[c] = csv[c].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ").str[:-4] + "Z"
+            csv[c] = csv[c].dt.strftime("%Y-%m-%dT%H:%M:%S.%f").str[:-3] + "Z"
     csv.to_csv(base.with_suffix(".csv"), index=False)
 
 
-def outputs_for(csv_path: Path) -> dict[str, Path]:
-    out = csv_path.parent.parent / PROCESSED
-    stem = csv_path.stem
-    return {
-        "flight": out / stem,  # .parquet and .csv
-        "wind": out / f"{stem}_wind",  # .parquet and .csv
-        "metadata": out / f"{stem}_metadata.json",
-        "report": out / f"{stem}.html",
-    }
+def output_dir(root: Path, flight_id: str) -> Path:
+    return root / PROCESSED / flight_id
 
 
-def process_session(s: Session) -> dict:
-    paths = outputs_for(s.source)
-    paths["report"].parent.mkdir(parents=True, exist_ok=True)
+def output_names(prefix: str) -> dict[str, str]:
+    """File names inside processed/<flight>/. ``prefix`` is "" when the folder holds one session."""
+    p = f"{prefix}_" if prefix else ""
+    return {"flight": f"{p}flight", "wind": f"{p}wind", "metadata": f"{p}metadata.json"}
+
+
+def process_session(s: Session, root: Path, prefix: str = "") -> dict:
+    out = output_dir(root, s.flight_id)
+    out.mkdir(parents=True, exist_ok=True)
+    names = output_names(prefix)
     summary = summarize(s)
     checks = run_checks(s, summary)
 
-    _write_table(s.flight, paths["flight"])
-    downloads = {
-        "flight data (Parquet)": paths["flight"].with_suffix(".parquet").name,
-        "flight data (CSV)": paths["flight"].with_suffix(".csv").name,
-    }
-    if s.wind is not None:
-        _write_table(s.wind, paths["wind"])
-        downloads["wind data (Parquet)"] = paths["wind"].with_suffix(".parquet").name
-        downloads["wind data (CSV)"] = paths["wind"].with_suffix(".csv").name
-    downloads["metadata (JSON)"] = paths["metadata"].name
+    _write_table(s.flight, out / names["flight"])
+    files = [f"{names['flight']}.parquet", f"{names['flight']}.csv"]
+    wind_path = out / names["wind"]
+    if s.wind is not None and len(s.wind):
+        _write_table(s.wind, wind_path)
+        files += [f"{names['wind']}.parquet", f"{names['wind']}.csv"]
+    else:
+        for ext in (".parquet", ".csv"):
+            wind_path.with_suffix(ext).unlink(missing_ok=True)
+    files.append(names["metadata"])
 
     header = {k: v for k, v in s.info["header"].items() if not k.startswith("_")}
     meta = {
         "pipeline_version": __version__,
+        "flight_id": s.flight_id,
+        "platform": s.info["platform"],
         "reader": s.info["reader"],
-        "source": {"file": s.source.name, "sha256": _sha256(s.source)},
+        "source": {"file": f"{RAW}/{s.flight_id}/{s.source.name}", "sha256": _sha256(s.source),
+                   "bytes": s.source.stat().st_size},
+        "files": files,
         "header": header,
         "summary": summary,
         "checks": checks,
@@ -76,25 +79,27 @@ def process_session(s: Session) -> dict:
         "wind": s.wind_info or None,
         "columns": {k: {"unit": u, "description": d} for k, (u, d) in FLIGHT_COLUMNS.items()},
         "wind_columns": {k: {"unit": u, "description": d} for k, (u, d) in WIND_COLUMNS.items()}
-        if s.wind is not None else None,
+        if s.wind is not None and len(s.wind) else None,
         "notes": "Columns not listed under 'columns' are raw logger columns carried through unchanged.",
     }
-    paths["metadata"].write_text(json.dumps(meta, indent=2, default=str) + "\n")
-    paths["report"].write_text(render(s, summary, checks, downloads))
+    (out / names["metadata"]).write_text(json.dumps(meta, indent=2, default=str) + "\n")
     return meta
 
 
-def process_flight_dir(flight_dir: Path, log=print) -> list[dict]:
-    metas = []
+def process_flight_dir(flight_dir: Path, root: Path, log=print) -> list[dict]:
+    sessions = []
     for csv_path in raw_logs(flight_dir):
-        s = load_session(csv_path)
+        s = load_session(csv_path, root)
         if s is None:
             log(f"  skip {csv_path.name}: no reader for this format")
             continue
-        meta = process_session(s)
+        sessions.append(s)
+    metas = []
+    for s in sessions:
+        meta = process_session(s, root, prefix="" if len(sessions) == 1 else s.stem)
         n_warn = sum(c["level"] == "warn" for c in meta["checks"])
-        log(f"  {csv_path.name}: {len(s.flight)} rows, {n_warn} warning(s)"
-            + (f", wind rows {s.wind_info['rows']}" if s.wind is not None else ""))
+        log(f"  {s.source.name} [{meta['reader']}]: {len(s.flight)} rows, {n_warn} warning(s), "
+            f"wind rows {s.wind_info.get('rows', 0)}")
         metas.append(meta)
     return metas
 
@@ -102,4 +107,15 @@ def process_flight_dir(flight_dir: Path, log=print) -> list[dict]:
 def process_all(root: Path, log=print) -> None:
     for d in find_flight_dirs(root):
         log(d.name)
-        process_flight_dir(d, log)
+        process_flight_dir(d, root, log)
+
+
+def load_all_metadata(root: Path) -> list[dict]:
+    """Metadata of every processed session, each with ``_dir`` (processed/<flight>) and ``_prefix``."""
+    metas = []
+    for m in sorted((root / PROCESSED).glob("*/*metadata.json")):
+        meta = json.loads(m.read_text())
+        meta["_dir"] = m.parent
+        meta["_prefix"] = m.name[: -len("metadata.json")].rstrip("_")
+        metas.append(meta)
+    return metas

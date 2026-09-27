@@ -1,17 +1,29 @@
-"""Turn one flight folder's raw data into cleaned, standard-schema tables."""
+"""Turn one flight's raw data into cleaned, standard-schema tables.
+
+Repository layout::
+
+    raw_data/<flight>/<log>.csv          flight log(s), never edited
+    raw_data/wind_drone/<bag>_csv/       wind-drone logs; each covers any number of flights
+    processed/<flight>/                  written by nasauli.pipeline
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from .platforms import platform_for
 from .readers import reader_for, wind_ros2
 
+RAW = "raw_data"
+WIND_DIR = "wind_drone"
 EARTH_RADIUS_M = 6_371_000.0
 WIND_MARGIN_S = 5.0
+AIRBORNE_ALT_M = 1.0
 
 
 @dataclass
@@ -26,11 +38,27 @@ class Session:
     def stem(self) -> str:
         return self.source.stem
 
+    @property
+    def flight_id(self) -> str:
+        return self.source.parent.name
+
+
+def armed_or_unknown(df: pd.DataFrame) -> pd.Series:
+    """Armed flag, or all-True when the log format has no armed information."""
+    a = df["armed"]
+    if a.isna().all():
+        return pd.Series(True, index=df.index)
+    return a.fillna(False).astype(bool)
+
+
+def airborne(df: pd.DataFrame) -> pd.Series:
+    return armed_or_unknown(df) & (df["alt_rel_m"] > AIRBORNE_ALT_M)
+
 
 def add_local_position(df: pd.DataFrame) -> dict:
     """Add north_m / east_m relative to home (position at arming, else first valid fix)."""
     valid = df["lat_deg"].notna() & (df["lat_deg"].abs() > 0.1)
-    armed_valid = valid & df["armed"]
+    armed_valid = valid & df["armed"].fillna(False).astype(bool)
     idx = armed_valid.idxmax() if armed_valid.any() else (valid.idxmax() if valid.any() else None)
     if idx is None:
         df["north_m"] = np.nan
@@ -59,7 +87,7 @@ def trim_wind(wind: pd.DataFrame, flight: pd.DataFrame, margin_s: float = WIND_M
         (cut["time_utc"] - t0).dt.total_seconds() + float(flight["elapsed_s"].iloc[0])
     ).round(3)
     cut = cut[["time_utc", "sensor_stamp_utc", "elapsed_s", "wind_speed_m_s", "wind_dir_deg",
-               "wind_z", "temperature_c"]].reset_index(drop=True)
+               "wind_z", "temperature_c", "source"]].reset_index(drop=True)
 
     flight_s = (t1 - t0).total_seconds()
     if len(cut):
@@ -69,41 +97,54 @@ def trim_wind(wind: pd.DataFrame, flight: pd.DataFrame, margin_s: float = WIND_M
     else:
         covered = 0.0
     info = {
-        "wind_log_start_utc": wind["time_utc"].min().isoformat(),
-        "wind_log_end_utc": wind["time_utc"].max().isoformat(),
         "flight_start_gps_utc": t0.isoformat(),
         "flight_end_gps_utc": t1.isoformat(),
         "margin_s": margin_s,
         "rows": int(len(cut)),
         "coverage_pct": round(100 * covered / flight_s, 1) if flight_s > 0 else 0.0,
+        "sources": sorted(cut["source"].unique().tolist()),
     }
     return cut, info
 
 
-def load_session(csv_path: Path) -> Session | None:
+@lru_cache(maxsize=None)
+def load_wind_logs(root: Path) -> tuple[pd.DataFrame | None, tuple[dict, ...]]:
+    """All wind-drone logs under raw_data/wind_drone/, concatenated, plus a per-log summary."""
+    parts, logs = [], []
+    for d in wind_ros2.find(root / RAW / WIND_DIR):
+        w = wind_ros2.read(d)
+        w["source"] = d.name
+        parts.append(w)
+        logs.append({"name": d.name, "start_utc": w["time_utc"].min().isoformat(),
+                     "end_utc": w["time_utc"].max().isoformat(), "rows": int(len(w))})
+    if not parts:
+        return None, ()
+    return pd.concat(parts).sort_values("time_utc").reset_index(drop=True), tuple(logs)
+
+
+def load_session(csv_path: Path, root: Path) -> Session | None:
     reader = reader_for(csv_path)
     if reader is None:
         return None
     df, info = reader.read(csv_path)
     info["home"] = add_local_position(df)
+    h = info["header"]
+    info["platform"] = platform_for(h.get("platform"), csv_path.parent.name, h.get("platform_label"))
     sess = Session(source=csv_path, flight=df, info=info)
 
-    wind_dirs = wind_ros2.find(csv_path.parent)
-    if wind_dirs:
-        parts, sources = [], []
-        for d in wind_dirs:
-            parts.append(wind_ros2.read(d))
-            sources.append(d.name)
-        wind = pd.concat(parts).sort_values("time_utc").reset_index(drop=True)
+    wind, logs = load_wind_logs(root)
+    if wind is not None and df["time_gps_utc"].notna().any():
         sess.wind, sess.wind_info = trim_wind(wind, df)
-        sess.wind_info["sources"] = sources
         sess.wind_info["reader"] = wind_ros2.NAME
+        sess.wind_info["logs_available"] = list(logs)
     return sess
 
 
 def find_flight_dirs(root: Path) -> list[Path]:
-    return sorted(p.parent for p in root.glob("*/raw_data") if p.is_dir())
+    base = root / RAW
+    return sorted(p for p in base.iterdir() if p.is_dir() and p.name != WIND_DIR) if base.is_dir() else []
 
 
 def raw_logs(flight_dir: Path) -> list[Path]:
-    return sorted((flight_dir / "raw_data").glob("*.csv"))
+    """Flight logs in a raw_data/<flight> folder (hand-edited ``*_Fixed`` copies excluded)."""
+    return sorted(p for p in flight_dir.glob("*.csv") if not p.stem.endswith("_Fixed"))

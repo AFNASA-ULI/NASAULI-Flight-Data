@@ -1,21 +1,23 @@
-name: Process flight data and publish site
+name: Build data and website
 
-# On every push to main that touches raw data or the pipeline:
-#   1. raw_data/ -> processed/ (Parquet, CSV, metadata JSON, HTML report) for every flight folder
+# On every push to main that touches raw data, the pipeline or the website:
+#   1. raw_data/ -> processed/ for every flight
 #   2. commit any changed processed/ files back to main
-#   3. build the website and deploy it to GitHub Pages
+#   3. build the Jupyter Book website and deploy it to GitHub Pages
 on:
   push:
     branches: [main]
     paths:
-      - "**/raw_data/**"
+      - "raw_data/**"
       - "nasauli/**"
-      - "requirements.txt"
-      - ".github/workflows/flight-data.yml"
+      - "book/**"
+      - "notebooks/**"
+      - "requirements*.txt"
+      - ".github/workflows/build.yml"
   workflow_dispatch:
 
 concurrency:
-  group: flight-data
+  group: build
   cancel-in-progress: false
 
 jobs:
@@ -31,14 +33,14 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt -r requirements-site.txt
 
       - name: Process raw data
         run: python -m nasauli process
 
       - name: Commit processed data
         run: |
-          git add -A -- '*/processed/*'
+          git add -A -- processed
           if git diff --cached --quiet; then
             echo "processed/ is up to date"
           else
@@ -49,7 +51,7 @@ jobs:
             git push origin HEAD:main
           fi
 
-      - name: Build site
+      - name: Build website
         run: python -m nasauli site --out _site
 
       - uses: actions/upload-pages-artifact@v3

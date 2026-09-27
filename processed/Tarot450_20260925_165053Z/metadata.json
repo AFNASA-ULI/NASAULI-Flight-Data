@@ -1,10 +1,25 @@
 {
   "pipeline_version": "1.0.0",
+  "flight_id": "Tarot450_20260925_165053Z",
+  "platform": {
+    "id": "TAROT_450",
+    "label": "Tarot 450",
+    "kind": "Quadcopter",
+    "description": "Tarot 450 quadcopter with an ArduPilot flight controller and a Raspberry Pi logger."
+  },
   "reader": "session_v2",
   "source": {
-    "file": "TAROT_450_20260923T153559Z.csv",
-    "sha256": "82b8bd0c3ee2e6d35651fc6c18bd4b80fbfab08db31e52bad4aa3c52f3215280"
+    "file": "raw_data/Tarot450_20260925_165053Z/TAROT_450_20260923T153559Z.csv",
+    "sha256": "47dcd71eb893653b19c54a0057d61c331ff7ffa90475f117efe4cc501fe6e278",
+    "bytes": 14998193
   },
+  "files": [
+    "flight.parquet",
+    "flight.csv",
+    "wind.parquet",
+    "wind.csv",
+    "metadata.json"
+  ],
   "header": {
     "format": "nasauli session log v2.0.0",
     "format_version": "2.0.0",
@@ -37,7 +52,8 @@
   },
   "summary": {
     "session_id": "TAROT_450_20260923T153559Z",
-    "platform": "Tarot 450 (quad)",
+    "platform": "Tarot 450",
+    "platform_id": "TAROT_450",
     "start_utc": "2026-09-25T16:39:58.882000+00:00",
     "end_utc": "2026-09-25T16:50:00.227000+00:00",
     "duration_s": 601.5,
@@ -114,11 +130,6 @@
     },
     {
       "level": "info",
-      "title": "Magnetometer columns mislabelled",
-      "detail": "IMU_*mag_mT holds MAVLink SCALED_IMU values, which are milligauss (Earth's field is \u2248500 mG, \u22480.05 mT). The cleaned data calls them mag_*_mgauss; the logger's column names should be fixed."
-    },
-    {
-      "level": "info",
       "title": "Empty columns",
       "detail": "23 column(s) have no data: BAT_Cell2_V, BAT_Cell3_V, BAT_Cell4_V, BAT_Temp_cdegC, BAT_TimeRemaining_s, ESC1_RPM, ESC2_RPM, ESC3_RPM, ESC4_RPM, ESC1_V, ESC2_V, ESC3_V, ESC4_V, ESC1_A, ESC2_A, ESC3_A, ESC4_A, ESC1_degC, ESC2_degC, ESC3_degC, ESC4_degC, ESC_rx_UTC, ESC_Age_ms"
     },
@@ -142,8 +153,6 @@
     "batt_temp_c"
   ],
   "wind": {
-    "wind_log_start_utc": "2026-09-25T16:28:15.725896202+00:00",
-    "wind_log_end_utc": "2026-09-25T16:58:18.928394923+00:00",
     "flight_start_gps_utc": "2026-09-25T16:40:00.989239962+00:00",
     "flight_end_gps_utc": "2026-09-25T16:50:02.334239962+00:00",
     "margin_s": 5.0,
@@ -152,7 +161,15 @@
     "sources": [
       "wind_drone_20260925_102813_csv"
     ],
-    "reader": "wind_ros2_csv"
+    "reader": "wind_ros2_csv",
+    "logs_available": [
+      {
+        "name": "wind_drone_20260925_102813_csv",
+        "start_utc": "2026-09-25T16:28:15.725896202+00:00",
+        "end_utc": "2026-09-25T16:58:18.928394923+00:00",
+        "rows": 9017
+      }
+    ]
   },
   "columns": {
     "time_utc": {

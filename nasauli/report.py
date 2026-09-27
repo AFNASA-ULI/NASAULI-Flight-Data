@@ -1,4 +1,9 @@
-"""Self-contained interactive HTML report for one flight (Plotly.js from a CDN)."""
+"""Interactive HTML report for one processed flight (Plotly.js from a CDN).
+
+Built from processed/<flight>/ (tables + metadata.json), never from raw data. The page works on its own
+and inside the website, where it is embedded in an iframe: in that mode it hides its own header, follows
+the site's light/dark theme, and reports its height to the parent page.
+"""
 
 from __future__ import annotations
 
@@ -8,9 +13,6 @@ import math
 
 import numpy as np
 import pandas as pd
-
-from . import __version__
-from .clean import Session
 
 MAX_PLOT_HZ = 10.0
 
@@ -26,8 +28,7 @@ def _fmt(x, unit="", nd=1):
     return f"{x:,.{nd}f}{unit}"
 
 
-def plot_data(s: Session) -> dict:
-    df = s.flight
+def plot_data(df: pd.DataFrame, wind: pd.DataFrame | None) -> dict:
     rate = (len(df) - 1) / max(df["elapsed_s"].iloc[-1] - df["elapsed_s"].iloc[0], 1e-9)
     step = max(1, round(rate / MAX_PLOT_HZ))
     d = df.iloc[::step]
@@ -47,15 +48,21 @@ def plot_data(s: Session) -> dict:
         "sats": _arr(d["gps_sats"], 0), "hdop": _arr(d["gps_hdop"], 2),
         "mode": [m if isinstance(m, str) else "—" for m in d["flight_mode"].astype(object)],
     }
-    wind = None
-    if s.wind is not None and len(s.wind):
-        w = s.wind
-        wind = {"t": _arr(w["elapsed_s"], 2), "spd": _arr(w["wind_speed_m_s"], 1),
-                "dir": _arr(w["wind_dir_deg"], 0), "temp": _arr(w["temperature_c"], 1)}
-    return {"D": data, "W": wind}
+    w = None
+    if wind is not None and len(wind):
+        w = {"t": _arr(wind["elapsed_s"], 2), "spd": _arr(wind["wind_speed_m_s"], 1),
+             "dir": _arr(wind["wind_dir_deg"], 0), "temp": _arr(wind["temperature_c"], 1)}
+    return {"D": data, "W": w}
 
 
-def _stats_html(sm: dict, s: Session) -> str:
+def circmean(deg: pd.Series) -> float:
+    r = np.radians(deg.dropna())
+    return float(np.degrees(np.arctan2(np.sin(r).mean(), np.cos(r).mean())) % 360)
+
+
+def stat_tiles(meta: dict, wind: pd.DataFrame | None) -> list[tuple[str, str, str]]:
+    """(label, value, detail) summary tiles, shared by the report and the website's flight pages."""
+    sm = meta["summary"]
     tiles = []
     if sm.get("airborne_s") is not None:
         tiles.append(("Flight", f"≈{sm['airborne_s']:.0f} s airborne",
@@ -63,38 +70,37 @@ def _stats_html(sm: dict, s: Session) -> str:
                       if sm.get("landed_in_log") else f"takeoff ≈{sm['takeoff_s']:.0f} s, log ends airborne"))
     else:
         tiles.append(("Flight", "not airborne", f"{sm['duration_s']:.0f} s logged"))
-    modes = [m[2] for m in sm["modes"] if m[2] != "—"]
     dur: dict[str, float] = {}
     for a, b, m in sm["modes"]:
         if m != "—":
             dur[m] = dur.get(m, 0.0) + (b - a)
-    main_mode = max(dur, key=dur.get) if dur else "–"
-    sub = f"RTL from {sm['rtl_s']:.1f} s" if sm.get("rtl_s") is not None else ", ".join(dict.fromkeys(modes))
-    tiles.append(("Mission", f"{main_mode}" + (f", {sm['mission_items']} WPs" if sm.get("mission_items") else ""), sub))
+    if dur:
+        main_mode = max(dur, key=dur.get)
+        sub = f"RTL from {sm['rtl_s']:.1f} s" if sm.get("rtl_s") is not None else ", ".join(dur)
+        tiles.append(("Mission", main_mode + (f", {sm['mission_items']} WPs" if sm.get("mission_items") else ""), sub))
     if sm.get("cruise_speed_m_s") is not None:
         tiles.append(("Cruise", f"{sm['cruise_alt_m']:.0f} m, {sm['cruise_speed_m_s']:.1f} m/s",
                       "relative alt, groundspeed"))
-    tiles.append(("Max range", _fmt(sm.get("max_range_m"), " m", 0), f"from home; max alt {_fmt(sm.get('max_alt_rel_m'), ' m')}"))
-    bsub = f"{_fmt(sm.get('batt_v_start'), ' V')} → {_fmt(sm.get('batt_v_end'), ' V')}"
-    bsub += " at rest" if sm.get("batt_v_end_at_rest") else " (end not at rest)"
-    if sm.get("cruise_current_a") is not None:
-        bsub += f", ≈{sm['cruise_current_a']:.0f} A cruise"
-    tiles.append(("Battery", _fmt(sm.get("batt_consumed_mah"), " mAh", 0), bsub))
-    if s.wind is not None:
-        if len(s.wind):
-            w = s.wind
-            tiles.append(("Wind (sensor)", f"{w['wind_speed_m_s'].mean():.1f} m/s mean",
-                          f"max {w['wind_speed_m_s'].max():.1f} m/s, from ≈{_circmean(w['wind_dir_deg']):.0f}°"))
-        else:
-            tiles.append(("Wind (sensor)", "no overlap", "see notes"))
+    tiles.append(("Max range", _fmt(sm.get("max_range_m"), " m", 0),
+                  f"from home; max alt {_fmt(sm.get('max_alt_rel_m'), ' m')}"))
+    if sm.get("batt_consumed_mah") is not None:
+        bsub = f"{_fmt(sm.get('batt_v_start'), ' V')} → {_fmt(sm.get('batt_v_end'), ' V')}"
+        bsub += " at rest" if sm.get("batt_v_end_at_rest") else " (end not at rest)"
+        if sm.get("cruise_current_a") is not None:
+            bsub += f", ≈{sm['cruise_current_a']:.0f} A cruise"
+        tiles.append(("Battery", _fmt(sm.get("batt_consumed_mah"), " mAh", 0), bsub))
+    if wind is not None and len(wind):
+        tiles.append(("Wind (sensor)", f"{wind['wind_speed_m_s'].mean():.1f} m/s mean",
+                      f"max {wind['wind_speed_m_s'].max():.1f} m/s, from ≈{circmean(wind['wind_dir_deg']):.0f}°"))
+    elif meta.get("wind"):
+        tiles.append(("Wind (sensor)", "none", "no wind log covers this flight"))
+    return tiles
+
+
+def _stats_html(tiles) -> str:
     return "\n".join(
         f'<div class="stat"><div class="k">{html.escape(k)}</div><div class="v">{html.escape(v)}</div>'
         f'<div class="s">{html.escape(sub)}</div></div>' for k, v, sub in tiles)
-
-
-def _circmean(deg: pd.Series) -> float:
-    r = np.radians(deg.dropna())
-    return float(np.degrees(np.arctan2(np.sin(r).mean(), np.cos(r).mean())) % 360)
 
 
 def _notes_html(checks: list[dict]) -> str:
@@ -104,36 +110,45 @@ def _notes_html(checks: list[dict]) -> str:
     items = "\n".join(
         f'<p class="{c["level"]}"><strong>{html.escape(c["title"])}.</strong> {html.escape(c["detail"])}</p>'
         for c in checks)
-    summary = f"Things to check in this log ({n_warn} warning{'s' if n_warn != 1 else ''}, {len(checks) - n_warn} note{'s' if len(checks) - n_warn != 1 else ''})"
+    n_info = len(checks) - n_warn
+    summary = (f"Things to check in this log ({n_warn} warning{'s' if n_warn != 1 else ''}, "
+               f"{n_info} note{'s' if n_info != 1 else ''})")
     return f'<details class="notes" open>\n<summary>{summary}</summary>\n{items}\n</details>'
 
 
-def render(s: Session, summary: dict, checks: list[dict], downloads: dict[str, str]) -> str:
-    h = s.info["header"]
-    start = pd.Timestamp(summary["start_utc"])
-    end = pd.Timestamp(summary["end_utc"])
-    platform = summary.get("platform") or "Flight"
-    title = f"{platform.split(' (')[0]} flight, {start:%d %b %Y %H:%M} UTC"
-    sub = (f"Session <code>{html.escape(summary['session_id'])}</code>, {start:%d %b %Y}, host UTC "
-           f"{start:%H:%M:%S} to {end:%H:%M:%S} ({summary['duration_s']:.0f} s at "
-           f"{summary['sample_rate_hz']:.0f} Hz). Shaded bands are AUTO mode. Zoom any time plot and the "
-           "others follow; the time range you zoom to is highlighted on the ground track.")
+def title_for(meta: dict) -> str:
+    start = pd.Timestamp(meta["summary"]["start_utc"])
+    return f"{meta['platform']['label']} flight, {start:%d %b %Y %H:%M} UTC"
+
+
+def render(meta: dict, flight: pd.DataFrame, wind: pd.DataFrame | None,
+           downloads: dict[str, str], back_href: str = "../index.html") -> str:
+    sm = meta["summary"]
+    start = pd.Timestamp(sm["start_utc"])
+    end = pd.Timestamp(sm["end_utc"])
+    has_modes = any(m[2] != "—" for m in sm["modes"])
+    sub = (f"Session <code>{html.escape(sm['session_id'])}</code>, {start:%d %b %Y}, UTC "
+           f"{start:%H:%M:%S} to {end:%H:%M:%S} ({sm['duration_s']:.0f} s at {sm['sample_rate_hz']:.0f} Hz). "
+           + ("Shaded bands are AUTO mode. " if has_modes else "")
+           + "Zoom any time plot and the others follow; the time range you zoom to is highlighted on the ground track.")
     dl = " · ".join(f'<a href="{html.escape(href)}">{html.escape(label)}</a>' for label, href in downloads.items())
-    footer = (f"Generated from <code>{html.escape(s.source.name)}</code> ({html.escape(h.get('format', ''))}) by the "
-              f"nasauli pipeline v{__version__}, reader <code>{s.info['reader']}</code>. Time axis is "
+    footer = (f"Generated from <code>{html.escape(meta['source']['file'])}</code> "
+              f"({html.escape(meta['header'].get('format', ''))}) by the nasauli pipeline "
+              f"v{meta['pipeline_version']}, reader <code>{meta['reader']}</code>. Time axis is "
               f"<code>elapsed_s</code>; hover times are GPS-corrected UTC.")
     wind_section = ""
-    if s.wind is not None and len(s.wind):
-        wind_section = ('<section><h2>Wind sensor</h2><p class="cap">Wind drone, speed (left axis) and direction '
-                        '(right axis, dots). Trimmed to this flight on GPS time.</p><div id="p-wind" class="plot"></div></section>')
-    pd_json = json.dumps(plot_data(s), separators=(",", ":"))
-    modes_json = json.dumps(summary["modes"], separators=(",", ":"))
+    if wind is not None and len(wind):
+        wind_section = ('<section data-plot="p-wind"><h2>Wind sensor</h2><p class="cap">Wind drone, speed (left axis) '
+                        'and direction (right axis, dots). Trimmed to this flight on GPS time.</p>'
+                        '<div id="p-wind" class="plot"></div></section>')
     out = TEMPLATE
     for k, v in {
-        "__TITLE__": html.escape(title), "__H1__": html.escape(f"{platform.split(' (')[0]} flight"),
-        "__SUB__": sub, "__STATS__": _stats_html(summary, s), "__NOTES__": _notes_html(checks),
+        "__TITLE__": html.escape(title_for(meta)), "__H1__": html.escape(f"{meta['platform']['label']} flight"),
+        "__BACK__": html.escape(back_href),
+        "__SUB__": sub, "__STATS__": _stats_html(stat_tiles(meta, wind)), "__NOTES__": _notes_html(meta["checks"]),
         "__WIND__": wind_section, "__DOWNLOADS__": dl, "__FOOTER__": footer,
-        "__MODES__": modes_json, "__DATA__": pd_json,
+        "__MODES__": json.dumps(sm["modes"], separators=(",", ":")),
+        "__DATA__": json.dumps(plot_data(flight, wind), separators=(",", ":")),
     }.items():
         out = out.replace(k, v)
     return out
@@ -182,11 +197,15 @@ button{font:inherit;font-size:.85rem;color:var(--ink);background:var(--panel);bo
 button:focus-visible{outline:2px solid var(--c1);outline-offset:2px}
 .downloads{margin:0 0 18px;font-size:.9rem}
 footer{color:var(--muted);font-size:.85rem;margin-top:10px}
+html.embed .head,html.embed footer{display:none}
+html.embed body{background:transparent}
+html.embed main{padding:0;max-width:none}
 </style>
 </head>
 <body>
 <main>
-<p class="downloads"><a href="../">← All flights</a></p>
+<div class="head">
+<p class="downloads"><a href="__BACK__">← All flights</a></p>
 <h1>__H1__</h1>
 <p class="sub">__SUB__</p>
 <div class="stats">
@@ -194,29 +213,43 @@ __STATS__
 </div>
 __NOTES__
 <p class="downloads">Download: __DOWNLOADS__</p>
+</div>
 <div class="bar"><span class="readout" id="readout">Hover a plot to read values.</span><button id="reset" type="button">Reset zoom</button></div>
 <div class="top">
 <section><h2>Ground track</h2><p class="cap">Metres from home, equal scale. Colour is time.</p><div id="p-track" class="plot"></div></section>
 <div class="stack">
-<section><h2>Relative altitude</h2><div id="p-alt" class="plot"></div></section>
-<section><h2>Groundspeed and climb rate</h2><div id="p-gs" class="plot"></div></section>
+<section data-plot="p-alt"><h2>Relative altitude</h2><div id="p-alt" class="plot"></div></section>
+<section data-plot="p-gs"><h2>Groundspeed and climb rate</h2><div id="p-gs" class="plot"></div></section>
 </div>
 </div>
 <section style="margin-bottom:14px"><h2>3D trajectory</h2><p class="cap">Metres from home; height relative to takeoff, vertical scale exaggerated. Drag to rotate, scroll to zoom.</p><div id="p-3d" class="plot" style="height:520px"></div></section>
 <div class="stack">
 __WIND__
-<section><h2>Attitude</h2><p class="cap">Roll and pitch in degrees.</p><div id="p-att" class="plot"></div></section>
-<section><h2>Battery</h2><p class="cap">Voltage (left axis), current (right axis)</p><div id="p-bat" class="plot"></div></section>
-<section><h2>Motor outputs</h2><p class="cap">SRV1–4 PWM, µs</p><div id="p-mot" class="plot"></div></section>
-<section><h2>Vibration</h2><p class="cap">m/s²</p><div id="p-vib" class="plot"></div></section>
-<section><h2>EKF variances</h2><p class="cap">Dotted line: ArduPilot's default failsafe threshold (0.8)</p><div id="p-ekf" class="plot"></div></section>
+<section data-plot="p-att"><h2>Attitude</h2><p class="cap">Roll and pitch in degrees.</p><div id="p-att" class="plot"></div></section>
+<section data-plot="p-bat"><h2>Battery</h2><p class="cap">Voltage (left axis), current (right axis)</p><div id="p-bat" class="plot"></div></section>
+<section data-plot="p-mot"><h2>Motor outputs</h2><p class="cap">SRV1–4 PWM, µs</p><div id="p-mot" class="plot"></div></section>
+<section data-plot="p-vib"><h2>Vibration</h2><p class="cap">m/s²</p><div id="p-vib" class="plot"></div></section>
+<section data-plot="p-ekf"><h2>EKF variances</h2><p class="cap">Dotted line: ArduPilot's default failsafe threshold (0.8)</p><div id="p-ekf" class="plot"></div></section>
 </div>
 <footer>__FOOTER__</footer>
 </main>
 <script>
 const MODES=__MODES__;
 const P=__DATA__;const D=P.D,W=P.W;
-const TS=['p-alt','p-gs','p-att','p-bat','p-mot','p-vib','p-ekf'].concat(W?['p-wind']:[]);
+// Embedded in the website: hide the page header, follow the site's theme, size the iframe to the content.
+const EMBED=window.self!==window.top;
+if(EMBED){document.documentElement.classList.add('embed');
+  try{const pr=window.parent.document.documentElement,sync=()=>{const t=pr.dataset.theme;if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme;
+      document.body.style.background=getComputedStyle(window.parent.document.body).backgroundColor;};
+    sync();new MutationObserver(sync).observe(pr,{attributes:true,attributeFilter:['data-theme']});
+    const fit=()=>{const m=document.querySelector('main');if(window.frameElement&&m)window.frameElement.style.height=Math.ceil(m.getBoundingClientRect().height)+8+'px';};
+    new ResizeObserver(fit).observe(document.querySelector('main'));window.addEventListener('load',fit);}catch(e){}}
+// Drop panels whose data this log format doesn't have.
+const has=(...ks)=>ks.some(k=>(D[k]||[]).some(v=>v!==null&&v!==0));
+const AVAIL={'p-alt':has('alt'),'p-gs':has('gs','vz'),'p-att':has('roll','pitch'),'p-bat':has('V','I'),'p-mot':has('m1','m2','m3','m4'),
+  'p-vib':has('vx','vy','vzb'),'p-ekf':has('ev','eph','epv','ec'),'p-wind':!!W};
+document.querySelectorAll('section[data-plot]').forEach(s=>{if(!AVAIL[s.dataset.plot])s.remove();});
+const TS=Object.keys(AVAIL).filter(k=>AVAIL[k]);
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const cfg={responsive:true,displaylogo:false,modeBarButtonsToRemove:['lasso2d','select2d']};
 function axis(extra){return Object.assign({gridcolor:css('--grid'),zerolinecolor:css('--rule'),linecolor:css('--rule'),tickfont:{color:css('--muted')},title:{font:{color:css('--muted')}}},extra||{});}
@@ -233,7 +266,9 @@ function base(extra){
 const L=(y,name,c,o)=>Object.assign({x:D.t,y,name,type:'scatter',mode:'lines',line:{color:c,width:1.3}},o||{});
 const hmax=Math.max(5,...D.alt.filter(v=>v!==null));
 let xr=null;
+const PR=(...a)=>Plotly.react(...a);
 function draw(){
+  const react=(id,...a)=>{if(document.getElementById(id))return PR(id,...a);};
   const c1=css('--c1'),c2=css('--c2'),c3=css('--c3'),c4=css('--c4');
   const tr={x:D.E,y:D.N,type:'scatter',mode:'markers',name:'track',marker:{size:3,color:D.t,colorscale:'Viridis',showscale:true,colorbar:{title:{text:'s',font:{color:css('--muted')}},thickness:10,tickfont:{color:css('--muted')},len:.8}},
     customdata:D.t.map((t,i)=>[t,D.alt[i],D.gs[i]]),hovertemplate:'t %{customdata[0]:.1f} s<br>E %{x:.1f} m, N %{y:.1f} m<br>alt %{customdata[1]:.1f} m, gs %{customdata[2]:.1f} m/s<extra></extra>'};
@@ -241,15 +276,16 @@ function draw(){
   const sel=[];
   if(xr){const i0=D.t.findIndex(t=>t>=xr[0]),i1=D.t.findIndex(t=>t>xr[1]);const j=i1<0?D.t.length:i1;
     if(i0>=0)sel.push({x:D.E.slice(i0,j),y:D.N.slice(i0,j),type:'scatter',mode:'lines',name:'zoomed range',line:{color:c4,width:4},hoverinfo:'skip'});}
-  Plotly.react('p-track',[tr,home,...sel],{margin:{l:52,r:10,t:10,b:40},paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',
+  react('p-track',[tr,home,...sel],{margin:{l:52,r:10,t:10,b:40},paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',
     font:{family:'IBM Plex Sans, system-ui, sans-serif',size:12,color:css('--ink')},showlegend:false,
     xaxis:axis({title:{text:'east [m]'}}),yaxis:axis({title:{text:'north [m]'},scaleanchor:'x',scaleratio:1}),
     hoverlabel:{bgcolor:css('--panel'),bordercolor:css('--rule'),font:{color:css('--ink')}}},cfg);
   // 3D: one coloured segment per flight-mode run
-  const pal=[c1,c2,c3,c4,css('--muted')],names=[...new Set(D.mode)],cm={};names.forEach((n,i)=>cm[n]=n==='—'?css('--muted'):pal[i%4]);
+  const pal=[c1,c2,c3,c4],names=[...new Set(D.mode)],cm={};names.forEach((n,i)=>cm[n]=names.length===1?c1:(n==='—'?css('--muted'):pal[i%4]));
+  const mlabel=m=>names.length===1&&m==='—'?'flight path':(m==='—'?'no mode':m);
   const segs=[],seen=new Set();let st=0;
   for(let i=1;i<=D.mode.length;i++){if(i===D.mode.length||D.mode[i]!==D.mode[st]){const a=Math.max(0,st-1),m=D.mode[st];
-    segs.push({type:'scatter3d',mode:'lines',name:m,legendgroup:m,showlegend:!seen.has(m),x:D.E.slice(a,i),y:D.N.slice(a,i),z:D.alt.slice(a,i),
+    segs.push({type:'scatter3d',mode:'lines',name:mlabel(m),legendgroup:m,showlegend:!seen.has(m),x:D.E.slice(a,i),y:D.N.slice(a,i),z:D.alt.slice(a,i),
       customdata:D.t.slice(a,i),line:{color:cm[m],width:6},hovertemplate:'t %{customdata:.1f} s<br>E %{x:.0f} m, N %{y:.0f} m<br>h %{z:.1f} m<extra>'+m+'</extra>'});seen.add(m);st=i;}}
   const shadow={type:'scatter3d',mode:'lines',name:'ground track',x:D.E,y:D.N,z:D.alt.map(()=>0),line:{color:css('--rule'),width:3},hoverinfo:'skip'};
   const dx=[],dy=[],dz=[],every=Math.max(1,Math.round(5/((D.t[1]-D.t[0])||0.1)));
@@ -259,23 +295,23 @@ function draw(){
   const sa=a=>Object.assign(axis(a),{backgroundcolor:'rgba(0,0,0,0)',showbackground:false});
   const ex=v=>v.filter(x=>x!==null),span=a=>Math.max(1,Math.max(...ex(a))-Math.min(...ex(a)));
   const sx=span(D.E),sy=span(D.N),big=Math.max(sx,sy);
-  Plotly.react('p-3d',[shadow,drops,...segs,hm],{margin:{l:0,r:0,t:0,b:0},paper_bgcolor:'rgba(0,0,0,0)',font:{family:'IBM Plex Sans, system-ui, sans-serif',size:12,color:css('--ink')},
+  react('p-3d',[shadow,drops,...segs,hm],{margin:{l:0,r:0,t:0,b:0},paper_bgcolor:'rgba(0,0,0,0)',font:{family:'IBM Plex Sans, system-ui, sans-serif',size:12,color:css('--ink')},
     legend:{orientation:'h',x:0,y:1,bgcolor:'rgba(0,0,0,0)'},uirevision:'3d',
     scene:{xaxis:sa({title:{text:'east [m]'}}),yaxis:sa({title:{text:'north [m]'}}),zaxis:sa({title:{text:'height [m]'},range:[0,hmax*1.15]}),
       aspectmode:'manual',aspectratio:{x:1.2*sx/big,y:1.2*sy/big,z:0.36},camera:{eye:{x:1.35,y:-1.3,z:0.75},center:{x:0,y:0,z:-0.15}}},
     hoverlabel:{bgcolor:css('--panel'),bordercolor:css('--rule'),font:{color:css('--ink')}}},cfg);
   const X=xr?{range:xr}:{range:[D.t[0],D.t[D.t.length-1]]};
   const B=(ex)=>{const b=base(ex);b.xaxis=Object.assign(b.xaxis,X);return b;};
-  Plotly.react('p-alt',[L(D.alt,'alt [m]',c1)],B({yaxis:axis({title:{text:'m'},rangemode:'tozero'}),showlegend:false}),cfg);
-  Plotly.react('p-gs',[L(D.gs,'groundspeed',c1),L(D.vz,'climb rate',c2)],B({yaxis:axis({title:{text:'m/s'}})}),cfg);
-  Plotly.react('p-att',[L(D.roll,'roll',c1),L(D.pitch,'pitch',c2)],B({yaxis:axis({title:{text:'deg'}})}),cfg);
-  Plotly.react('p-bat',[L(D.V,'voltage',c1),L(D.I,'current',c4,{yaxis:'y2',line:{color:c4,width:1}})],
+  react('p-alt',[L(D.alt,'alt [m]',c1)],B({yaxis:axis({title:{text:'m'},rangemode:'tozero'}),showlegend:false}),cfg);
+  react('p-gs',[L(D.gs,'groundspeed',c1),L(D.vz,'climb rate',c2)],B({yaxis:axis({title:{text:'m/s'}})}),cfg);
+  react('p-att',[L(D.roll,'roll',c1),L(D.pitch,'pitch',c2)],B({yaxis:axis({title:{text:'deg'}})}),cfg);
+  react('p-bat',[L(D.V,'voltage',c1),L(D.I,'current',c4,{yaxis:'y2',line:{color:c4,width:1}})],
     B({yaxis:axis({title:{text:'V'}}),yaxis2:axis({title:{text:'A'},overlaying:'y',side:'right',showgrid:false,rangemode:'tozero'})}),cfg);
-  Plotly.react('p-mot',[L(D.m1,'SRV1',c1),L(D.m2,'SRV2',c2),L(D.m3,'SRV3',c3),L(D.m4,'SRV4',c4)],B({yaxis:axis({title:{text:'µs'}})}),cfg);
-  Plotly.react('p-vib',[L(D.vx,'X',c1),L(D.vy,'Y',c2),L(D.vzb,'Z',c3)],B({yaxis:axis({title:{text:'m/s²'},rangemode:'tozero'})}),cfg);
-  Plotly.react('p-ekf',[L(D.ev,'velocity',c1),L(D.eph,'pos horiz',c3),L(D.epv,'pos vert',c2),L(D.ec,'compass',c4)],
+  react('p-mot',[L(D.m1,'SRV1',c1),L(D.m2,'SRV2',c2),L(D.m3,'SRV3',c3),L(D.m4,'SRV4',c4)],B({yaxis:axis({title:{text:'µs'}})}),cfg);
+  react('p-vib',[L(D.vx,'X',c1),L(D.vy,'Y',c2),L(D.vzb,'Z',c3)],B({yaxis:axis({title:{text:'m/s²'},rangemode:'tozero'})}),cfg);
+  react('p-ekf',[L(D.ev,'velocity',c1),L(D.eph,'pos horiz',c3),L(D.epv,'pos vert',c2),L(D.ec,'compass',c4)],
     B({yaxis:axis({title:{text:'variance'},rangemode:'tozero'}),shapes:base().shapes.concat([{type:'line',xref:'paper',x0:0,x1:1,y0:.8,y1:.8,line:{color:c4,width:1,dash:'dot'}}])}),cfg);
-  if(W)Plotly.react('p-wind',[{x:W.t,y:W.spd,name:'speed',type:'scatter',mode:'lines',line:{color:c1,width:1.3}},
+  if(W)react('p-wind',[{x:W.t,y:W.spd,name:'speed',type:'scatter',mode:'lines',line:{color:c1,width:1.3}},
       {x:W.t,y:W.dir,name:'direction',type:'scatter',mode:'markers',yaxis:'y2',marker:{color:c2,size:3}}],
     B({yaxis:axis({title:{text:'m/s'},rangemode:'tozero'}),yaxis2:axis({title:{text:'deg'},overlaying:'y',side:'right',showgrid:false,range:[0,360],dtick:90})}),cfg);
 }

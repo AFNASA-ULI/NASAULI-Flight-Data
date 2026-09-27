@@ -7,10 +7,9 @@ import re
 import numpy as np
 import pandas as pd
 
-from .clean import Session
+from .clean import Session, airborne, armed_or_unknown
 from .schema import FLIGHT_COLUMNS
 
-AIRBORNE_ALT_M = 1.0
 COMPASS_VAR_WARN = 0.5  # ArduPilot's default EKF failsafe threshold is 0.8
 VIBE_WARN = 30.0  # m/s^2, ArduPilot's guidance for "too high"
 
@@ -34,10 +33,12 @@ def mode_segments(df: pd.DataFrame) -> list[list]:
 def summarize(s: Session) -> dict:
     df = s.flight
     t = df["elapsed_s"]
-    air = df["armed"] & (df["alt_rel_m"] > AIRBORNE_ALT_M)
+    air = airborne(df)
+    armed = armed_or_unknown(df)
     out: dict = {
         "session_id": s.info["header"].get("session_id", s.stem),
-        "platform": s.info["header"].get("platform_label") or s.info["header"].get("platform"),
+        "platform": s.info["platform"]["label"],
+        "platform_id": s.info["platform"]["id"],
         "start_utc": df["time_utc"].min().isoformat(),
         "end_utc": df["time_utc"].max().isoformat(),
         "duration_s": _r(t.max() - t.min()),
@@ -65,10 +66,12 @@ def summarize(s: Session) -> dict:
     rtl = df.index[df["flight_mode"].eq("RTL") & (t > out.get("takeoff_s", -1))]
     out["rtl_s"] = _r(t[rtl[0]]) if len(rtl) else None
 
+    # "At rest": disarmed, or (when the log has no armed flag) drawing almost no current.
+    rest = ~armed if df["armed"].notna().any() else (df["batt_current_a"] < 1.0)
     mah = df["batt_consumed_mah"].dropna()
     out["batt_consumed_mah"] = _r(mah.max() - mah.min(), 0) if len(mah) else None
-    rest_before = df.loc[~df["armed"] & (t < out.get("takeoff_s", t.max())), "batt_voltage_v"]
-    rest_after = df.loc[~df["armed"] & (t > out.get("landing_s", t.max())), "batt_voltage_v"]
+    rest_before = df.loc[rest & (t < out.get("takeoff_s", t.max())), "batt_voltage_v"]
+    rest_after = df.loc[rest & (t > out.get("landing_s", t.max())), "batt_voltage_v"]
     out["batt_v_start"] = _r(rest_before.median(), 2) if len(rest_before) else _r(df["batt_voltage_v"].iloc[0], 2)
     out["batt_v_end"] = _r(rest_after.median(), 2) if len(rest_after) else _r(df["batt_voltage_v"].iloc[-1], 2)
     out["batt_v_end_at_rest"] = bool(len(rest_after))
@@ -78,6 +81,7 @@ def summarize(s: Session) -> dict:
 def run_checks(s: Session, summary: dict) -> list[dict]:
     """Return a list of {"level": "warn"|"info", "title", "detail"} findings."""
     df, info, h = s.flight, s.info, s.info["header"]
+    air = airborne(df)
     found: list[dict] = []
 
     def add(level, title, detail):
@@ -85,16 +89,26 @@ def run_checks(s: Session, summary: dict) -> list[dict]:
 
     # --- wind sensor overlap
     if s.wind is None:
-        add("info", "No wind-drone log", "No wind sensor data was found in this flight's raw_data folder.")
+        add("info", "No wind-drone data", "There are no wind-drone logs in raw_data/wind_drone/.")
     else:
         w = s.wind_info
         if w["rows"] == 0:
-            add("warn", "Wind log doesn't overlap this flight",
-                f"The wind log covers {w['wind_log_start_utc'][11:19]}–{w['wind_log_end_utc'][11:19]} UTC; "
-                f"this flight runs {w['flight_start_gps_utc'][11:19]}–{w['flight_end_gps_utc'][11:19]} UTC (GPS time).")
+            same_day = [lg for lg in w.get("logs_available", [])
+                        if lg["start_utc"][:10] == w["flight_start_gps_utc"][:10]]
+            if same_day:
+                spans = ", ".join(f"{lg['start_utc'][11:19]}–{lg['end_utc'][11:19]}" for lg in same_day)
+                add("warn", "No wind data for this flight",
+                    f"That day's wind log(s) cover {spans} UTC; this flight runs "
+                    f"{w['flight_start_gps_utc'][11:19]}–{w['flight_end_gps_utc'][11:19]} UTC (GPS time).")
+            else:
+                add("info", "No wind data for this flight", "No wind-drone log was recorded on this day.")
         elif w["coverage_pct"] < 99:
             add("warn", "Wind log only partly overlaps this flight",
                 f"It covers {w['coverage_pct']}% of the flight.")
+
+    # --- reader notes (known quirks of this log format)
+    for note in info.get("notes", []):
+        add("info", "Log format note", note)
 
     # --- clocks
     off = info.get("gps_clock_offset_s")
@@ -132,7 +146,7 @@ def run_checks(s: Session, summary: dict) -> list[dict]:
     hb = info.get("raw_hb_armed")
     if hb is not None:
         raw_toggles = int(hb.dropna().diff().abs().sum())
-        clean_toggles = int(df["armed"].astype(int).diff().abs().sum())
+        clean_toggles = int(df["armed"].fillna(False).astype(int).diff().abs().sum())
         if raw_toggles > 4 * max(clean_toggles, 1):
             add("info", "HB_Armed mixes heartbeats from several MAVLink components",
                 f"The raw HB_Armed column flips {raw_toggles} times. The cleaned armed column only uses autopilot "
@@ -175,7 +189,6 @@ def run_checks(s: Session, summary: dict) -> list[dict]:
     if clips.fillna(0).sum() > 0:
         add("warn", "Accelerometer clipping", "Clip counters increased during the log: "
             + ", ".join(f"{k} +{int(v)}" for k, v in clips.items() if v > 0))
-    air = df["armed"] & (df["alt_rel_m"] > AIRBORNE_ALT_M)
     if air.any():
         sats = df.loc[air, "gps_sats"].min()
         hdop = df.loc[air, "gps_hdop"].max()

@@ -1,151 +1,137 @@
 {
   "pipeline_version": "1.0.0",
-  "reader": "session_v2",
-  "source": {
-    "file": "TAROT_450_20260925T165912Z.csv",
-    "sha256": "ca6194061fbf2555540393cca466fa29b019eb5051fc9c56942944cb5e62df5b"
+  "flight_id": "Tarot450_20260408",
+  "platform": {
+    "id": "TAROT_450",
+    "label": "Tarot 450",
+    "kind": "Quadcopter",
+    "description": "Tarot 450 quadcopter with an ArduPilot flight controller and a Raspberry Pi logger."
   },
+  "reader": "legacy_v1",
+  "source": {
+    "file": "raw_data/Tarot450_20260408/Flight2_Tarrot450_2026_04_08.csv",
+    "sha256": "3fd9bad02669b14e9995efe1df751dac6788038fcb4aaf82a75ecd9b60f6a56b",
+    "bytes": 1458462
+  },
+  "files": [
+    "flight.parquet",
+    "flight.csv",
+    "metadata.json"
+  ],
   "header": {
-    "format": "nasauli session log v2.0.0",
-    "format_version": "2.0.0",
-    "session_id": "TAROT_450_20260925T165912Z",
-    "platform": "TAROT_450",
-    "platform_label": "Tarot 450 (quad)",
-    "mode": "flight",
-    "start_utc": "2026-09-25T17:01:07.552Z",
-    "sample_rate_hz_target": "20.0",
-    "operator": "",
-    "location": "",
-    "factorial_condition": "",
-    "replicate": "",
-    "commanded_altitude_m": "",
-    "commanded_speed_ms": "",
-    "adc_enabled": "False",
-    "temp_enabled": "True",
-    "mavlink_enabled": "True",
-    "time_base": "system UTC disciplined by chrony (ground-station peer)",
-    "hostname": "bumblebee",
-    "notes": "",
-    "chrony_reference_id": "00000000 ()",
-    "chrony_stratum": "0",
-    "chrony_last_offset_s": "+0.000000000 seconds",
-    "chrony_synchronised": "False",
-    "i2c_unavailable": "none",
-    "mavlink_connected": "True",
-    "mavlink_target_system": "1",
-    "mavlink_groups": "core,power,flight,quality,wind"
+    "format": "early logger CSV (v1, no header block)",
+    "format_version": "1",
+    "gps_synced_from_row": 2
   },
   "summary": {
-    "session_id": "TAROT_450_20260925T165912Z",
-    "platform": "Tarot 450 (quad)",
-    "start_utc": "2026-09-25T17:01:08.524000+00:00",
-    "end_utc": "2026-09-25T17:04:59.733000+00:00",
-    "duration_s": 231.2,
-    "samples": 4626,
-    "sample_rate_hz": 20.0,
+    "session_id": "Flight2_Tarrot450_2026_04_08",
+    "platform": "Tarot 450",
+    "platform_id": "TAROT_450",
+    "start_utc": "2026-04-08T16:57:11.937000+00:00",
+    "end_utc": "2026-04-08T16:59:51.966000+00:00",
+    "duration_s": 160.0,
+    "samples": 2068,
+    "sample_rate_hz": 12.92,
     "modes": [
       [
         0.0,
-        0.8,
+        160.03,
         "\u2014"
-      ],
-      [
-        0.8,
-        11.35,
-        "RTL"
-      ],
-      [
-        11.35,
-        22.85,
-        "POSHOLD"
-      ],
-      [
-        22.85,
-        176.85,
-        "AUTO"
-      ],
-      [
-        176.85,
-        231.25,
-        "RTL"
       ]
     ],
-    "takeoff_s": 19.4,
-    "landing_s": 224.8,
-    "airborne_s": 205.3,
+    "takeoff_s": 22.6,
+    "landing_s": 150.3,
+    "airborne_s": 127.7,
     "landed_in_log": true,
-    "max_alt_rel_m": 25.5,
-    "max_range_m": 379.0,
-    "cruise_alt_m": 25.0,
-    "cruise_speed_m_s": 9.0,
-    "cruise_current_a": 9.8,
-    "mission_items": 5,
-    "rtl_s": 176.8,
-    "batt_consumed_mah": 559.0,
-    "batt_v_start": 16.51,
-    "batt_v_end": 15.67,
+    "max_alt_rel_m": 16.3,
+    "max_range_m": 356.0,
+    "mission_items": 0,
+    "rtl_s": null,
+    "batt_consumed_mah": 375.0,
+    "batt_v_start": 16.43,
+    "batt_v_end": 15.88,
     "batt_v_end_at_rest": true
   },
   "checks": [
     {
       "level": "warn",
-      "title": "Wind log doesn't overlap this flight",
-      "detail": "The wind log covers 16:28:15\u201316:58:18 UTC; this flight runs 17:01:10\u201317:05:01 UTC (GPS time)."
-    },
-    {
-      "level": "warn",
-      "title": "Logger clock not synchronised",
-      "detail": "The header says chrony_synchronised: False; the host clock is 2.07 s behind the autopilot's GPS time. time_gps_utc corrects for this."
-    },
-    {
-      "level": "warn",
       "title": "Real-time clock (RTC) not set",
-      "detail": "RTC_UTC reads 2026-04-01 14:44:00, but the flight is on 2026-09-25."
-    },
-    {
-      "level": "warn",
-      "title": "High compass variance",
-      "detail": "EKF compass variance peaks at 0.92 (t = 223.9 s). ArduPilot's default failsafe threshold is 0.8."
+      "detail": "RTC_UTC reads 2026-04-01 14:44:00, but the flight is on 2026-04-08."
     },
     {
       "level": "info",
-      "title": "HB_Armed mixes heartbeats from several MAVLink components",
-      "detail": "The raw HB_Armed column flips 420 times. The cleaned armed column only uses autopilot heartbeats (base_mode bit 0 set) and changes 2 times. The logger should filter heartbeats to the autopilot's sysid/compid."
+      "title": "No wind data for this flight",
+      "detail": "No wind-drone log was recorded on this day."
     },
     {
       "level": "info",
-      "title": "Magnetometer columns mislabelled",
-      "detail": "IMU_*mag_mT holds MAVLink SCALED_IMU values, which are milligauss (Earth's field is \u2248500 mG, \u22480.05 mT). The cleaned data calls them mag_*_mgauss; the logger's column names should be fixed."
+      "title": "Log format note",
+      "detail": "Header unit labels for IMU acc/gyro/mag and RawGPS_vel are wrong; converted using the MAVLink units."
     },
     {
       "level": "info",
-      "title": "Empty columns",
-      "detail": "23 column(s) have no data: BAT_Cell2_V, BAT_Cell3_V, BAT_Cell4_V, BAT_Temp_cdegC, BAT_TimeRemaining_s, ESC1_RPM, ESC2_RPM, ESC3_RPM, ESC4_RPM, ESC1_V, ESC2_V, ESC3_V, ESC4_V, ESC1_A, ESC2_A, ESC3_A, ESC4_A, ESC1_degC, ESC2_degC, ESC3_degC, ESC4_degC, ESC_rx_UTC, ESC_Age_ms"
+      "title": "Log format note",
+      "detail": "Battery_* columns come from a sensor that was not connected; PM_* (power module) is used instead."
     },
     {
       "level": "info",
-      "title": "Autopilot wind estimate is constant",
-      "detail": "WND_* stays at speed 0.0, direction -180.0 for the whole log."
+      "title": "Log format note",
+      "detail": "No heartbeat, flight mode, servo, vibration or EKF data in this log format."
     }
   ],
   "home": {
-    "lat_deg": 39.0187655,
-    "lon_deg": -104.8934865
+    "lat_deg": 39.018744,
+    "lon_deg": -104.8934947
   },
-  "gps_clock_offset_s": 2.0663,
-  "missing_columns": [],
+  "gps_clock_offset_s": null,
+  "missing_columns": [
+    "airspeed_m_s",
+    "ap_wind_dir_deg",
+    "ap_wind_speed_m_s",
+    "ap_wind_speed_z_m_s",
+    "armed",
+    "baro_press_hpa",
+    "baro_temp_c",
+    "clip_0",
+    "clip_1",
+    "clip_2",
+    "ekf_compass_var",
+    "ekf_flags",
+    "ekf_pos_horiz_var",
+    "ekf_pos_vert_var",
+    "ekf_vel_var",
+    "flight_mode",
+    "gps_course_deg",
+    "gps_fix_type",
+    "gps_hdop",
+    "gps_vdop",
+    "mission_seq",
+    "motor1_us",
+    "motor2_us",
+    "motor3_us",
+    "motor4_us",
+    "throttle_pct",
+    "vib_x_m_s2",
+    "vib_y_m_s2",
+    "vib_z_m_s2",
+    "wp_dist_m"
+  ],
   "wind": {
-    "wind_log_start_utc": "2026-09-25T16:28:15.725896202+00:00",
-    "wind_log_end_utc": "2026-09-25T16:58:18.928394923+00:00",
-    "flight_start_gps_utc": "2026-09-25T17:01:10.590302060+00:00",
-    "flight_end_gps_utc": "2026-09-25T17:05:01.799302060+00:00",
+    "flight_start_gps_utc": "2026-04-08T16:57:11.937000+00:00",
+    "flight_end_gps_utc": "2026-04-08T16:59:51.966000+00:00",
     "margin_s": 5.0,
     "rows": 0,
     "coverage_pct": 0.0,
-    "sources": [
-      "wind_drone_20260925_102813_csv"
-    ],
-    "reader": "wind_ros2_csv"
+    "sources": [],
+    "reader": "wind_ros2_csv",
+    "logs_available": [
+      {
+        "name": "wind_drone_20260925_102813_csv",
+        "start_utc": "2026-09-25T16:28:15.725896202+00:00",
+        "end_utc": "2026-09-25T16:58:18.928394923+00:00",
+        "rows": 9017
+      }
+    ]
   },
   "columns": {
     "time_utc": {
@@ -433,35 +419,6 @@
       "description": "Autopilot wind estimate, vertical speed"
     }
   },
-  "wind_columns": {
-    "time_utc": {
-      "unit": "UTC",
-      "description": "Time the wind-drone computer received the message (ROS bag time)"
-    },
-    "sensor_stamp_utc": {
-      "unit": "UTC",
-      "description": "Timestamp in the message header, set by the sensor node"
-    },
-    "elapsed_s": {
-      "unit": "s",
-      "description": "Seconds on the matching flight's elapsed_s axis"
-    },
-    "wind_speed_m_s": {
-      "unit": "m/s",
-      "description": "Wind speed (vector.x)"
-    },
-    "wind_dir_deg": {
-      "unit": "deg",
-      "description": "Wind direction (vector.y)"
-    },
-    "wind_z": {
-      "unit": "-",
-      "description": "vector.z (unused by the sensor, always 0 so far)"
-    },
-    "temperature_c": {
-      "unit": "degC",
-      "description": "Wind sensor temperature"
-    }
-  },
+  "wind_columns": null,
   "notes": "Columns not listed under 'columns' are raw logger columns carried through unchanged."
 }

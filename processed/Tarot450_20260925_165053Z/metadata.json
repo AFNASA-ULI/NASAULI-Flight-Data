@@ -1,5 +1,5 @@
 {
-  "pipeline_version": "1.1.0",
+  "pipeline_version": "1.2.0",
   "flight_id": "Tarot450_20260925_165053Z",
   "platform": {
     "id": "TAROT_450",
@@ -97,7 +97,32 @@
     "batt_consumed_mah": 1648.0,
     "batt_v_start": 16.56,
     "batt_v_end": 13.76,
-    "batt_v_end_at_rest": false
+    "batt_v_end_at_rest": false,
+    "gps": {
+      "basis": "airborne",
+      "sats_min": 12.0,
+      "hdop_max": 2.05,
+      "fix": [
+        {
+          "type": 6,
+          "name": "RTK Fixed",
+          "accuracy": "~1\u20132 cm",
+          "pct": 75.6
+        },
+        {
+          "type": 5,
+          "name": "RTK Float",
+          "accuracy": "~0.2\u20131 m",
+          "pct": 23.6
+        },
+        {
+          "type": 4,
+          "name": "DGPS/SBAS",
+          "accuracy": "~0.5\u20132 m",
+          "pct": 0.8
+        }
+      ]
+    }
   },
   "checks": [
     {
@@ -114,6 +139,11 @@
       "level": "warn",
       "title": "Session ID date doesn't match the start time",
       "detail": "session_id is TAROT_450_20260923T153559Z, but start_utc is 2026-09-25T16:39:57.366Z. The logger probably reused an old session ID."
+    },
+    {
+      "level": "warn",
+      "title": "RTK fix not held for the whole flight",
+      "detail": "RTK Fixed (~1\u20132 cm) for 76% of the airborne time; the rest was RTK Float 24% (~0.2\u20131 m); DGPS/SBAS 1% (~0.5\u20132 m). Positions in those stretches are less accurate; the GPS panel shows when."
     },
     {
       "level": "warn",
@@ -301,7 +331,7 @@
     },
     "gps_fix_type": {
       "unit": "-",
-      "description": "GPS fix type (3 = 3D)"
+      "description": "MAVLink GPS fix type: 3 = 3D, 4 = DGPS, 5 = RTK Float, 6 = RTK Fixed"
     },
     "gps_hdop": {
       "unit": "-",

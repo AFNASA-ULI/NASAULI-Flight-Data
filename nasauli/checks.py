@@ -9,7 +9,7 @@ import pandas as pd
 
 from .clean import Session, airborne, armed_or_unknown
 from .localtime import fmt
-from .schema import FLIGHT_COLUMNS
+from .schema import FLIGHT_COLUMNS, GPS_FIX_TYPES
 
 COMPASS_VAR_WARN = 0.5  # ArduPilot's default EKF failsafe threshold is 0.8
 VIBE_WARN = 30.0  # m/s^2, ArduPilot's guidance for "too high"
@@ -78,6 +78,24 @@ def summarize(s: Session) -> dict:
     out["batt_v_start"] = _r(rest_before.median(), 2) if len(rest_before) else _r(df["batt_voltage_v"].iloc[0], 2)
     out["batt_v_end"] = _r(rest_after.median(), 2) if len(rest_after) else _r(df["batt_voltage_v"].iloc[-1], 2)
     out["batt_v_end_at_rest"] = bool(len(rest_after))
+    out["gps"] = gps_summary(df, air)
+    return out
+
+
+def gps_summary(df: pd.DataFrame, air: pd.Series) -> dict:
+    """Share of time in each GPS fix type (while airborne, else over the whole log), satellites, HDOP."""
+    rows = air if air.any() else pd.Series(True, index=df.index)
+    fix = df.loc[rows, "gps_fix_type"].dropna().astype(int)
+    out: dict = {"basis": "airborne" if air.any() else "whole log",
+                 "sats_min": _r(df.loc[rows, "gps_sats"].min(), 0),
+                 "hdop_max": _r(df.loc[rows, "gps_hdop"].max(), 2)}
+    if len(fix):
+        pct = (fix.value_counts(normalize=True) * 100).sort_index(ascending=False)
+        out["fix"] = [{"type": int(k), "name": GPS_FIX_TYPES.get(int(k), (f"type {k}", None))[0],
+                       "accuracy": GPS_FIX_TYPES.get(int(k), (None, None))[1], "pct": round(float(v), 1)}
+                      for k, v in pct.items()]
+    else:
+        out["fix"] = []
     return out
 
 
@@ -182,6 +200,15 @@ def run_checks(s: Session, summary: dict) -> list[dict]:
     if len(wind_ap) and wind_ap.nunique().max() <= 1:
         add("info", "Autopilot wind estimate is constant",
             f"WND_* stays at speed {wind_ap.iloc[0, 0]}, direction {wind_ap.iloc[0, 1]} for the whole log.")
+
+    # --- RTK fix held?
+    fixes = {f["type"]: f for f in summary.get("gps", {}).get("fix", [])}
+    if 6 in fixes and fixes[6]["pct"] < 99:
+        others = "; ".join(f"{f['name']} {f['pct']:.0f}%" + (f" ({f['accuracy']})" if f["accuracy"] else "")
+                           for t, f in fixes.items() if t != 6)
+        add("warn" if fixes[6]["pct"] < 90 else "info", "RTK fix not held for the whole flight",
+            f"RTK Fixed (~1–2 cm) for {fixes[6]['pct']:.0f}% of the {summary['gps']['basis']} time; "
+            f"the rest was {others}. Positions in those stretches are less accurate; the GPS panel shows when.")
 
     # --- EKF / vibration / GPS
     cv = df["ekf_compass_var"].max()

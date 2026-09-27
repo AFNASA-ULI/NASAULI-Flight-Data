@@ -1,5 +1,5 @@
 {
-  "pipeline_version": "1.1.0",
+  "pipeline_version": "1.2.0",
   "flight_id": "Tarot450_20260408",
   "platform": {
     "id": "TAROT_450",
@@ -52,7 +52,13 @@
     "batt_consumed_mah": 375.0,
     "batt_v_start": 16.43,
     "batt_v_end": 15.88,
-    "batt_v_end_at_rest": true
+    "batt_v_end_at_rest": true,
+    "gps": {
+      "basis": "airborne",
+      "sats_min": 29.0,
+      "hdop_max": null,
+      "fix": []
+    }
   },
   "checks": [
     {
@@ -264,7 +270,7 @@
     },
     "gps_fix_type": {
       "unit": "-",
-      "description": "GPS fix type (3 = 3D)"
+      "description": "MAVLink GPS fix type: 3 = 3D, 4 = DGPS, 5 = RTK Float, 6 = RTK Fixed"
     },
     "gps_hdop": {
       "unit": "-",

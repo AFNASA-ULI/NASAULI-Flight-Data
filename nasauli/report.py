@@ -47,7 +47,7 @@ def plot_data(df: pd.DataFrame, wind: pd.DataFrame | None) -> dict:
         "vx": _arr(d["vib_x_m_s2"], 2), "vy": _arr(d["vib_y_m_s2"], 2), "vzb": _arr(d["vib_z_m_s2"], 2),
         "ev": _arr(d["ekf_vel_var"], 3), "eph": _arr(d["ekf_pos_horiz_var"], 3),
         "epv": _arr(d["ekf_pos_vert_var"], 3), "ec": _arr(d["ekf_compass_var"], 3),
-        "sats": _arr(d["gps_sats"], 0), "hdop": _arr(d["gps_hdop"], 2),
+        "sats": _arr(d["gps_sats"], 0), "hdop": _arr(d["gps_hdop"], 2), "fixt": _arr(d["gps_fix_type"], 0),
         "mode": [m if isinstance(m, str) else "—" for m in d["flight_mode"].astype(object)],
     }
     w = None
@@ -91,6 +91,16 @@ def stat_tiles(meta: dict, wind: pd.DataFrame | None) -> list[tuple[str, str, st
         if sm.get("cruise_current_a") is not None:
             bsub += f", ≈{sm['cruise_current_a']:.0f} A cruise"
         tiles.append(("Battery", _fmt(sm.get("batt_consumed_mah"), " mAh", 0), bsub))
+    g = sm.get("gps") or {}
+    if g.get("fix"):
+        main = g["fix"][0] if g["fix"][0]["pct"] >= 50 else max(g["fix"], key=lambda f: f["pct"])
+        rest = [f for f in g["fix"] if f is not main]
+        gsub = (f"{main['accuracy']} error · " if main["accuracy"] else "") + f"{main['pct']:.0f}% of flight"
+        if rest:
+            gsub += "; " + ", ".join(f"{f['name']} {f['pct']:.0f}%" for f in rest)
+        tiles.append(("GPS", main["name"], gsub))
+    elif g.get("sats_min") is not None:
+        tiles.append(("GPS", "fix type not logged", f"≥{g['sats_min']:.0f} satellites"))
     if wind is not None and len(wind):
         tiles.append(("Wind (sensor)", f"{wind['wind_speed_m_s'].mean():.1f} m/s mean",
                       f"max {wind['wind_speed_m_s'].max():.1f} m/s, from ≈{circmean(wind['wind_dir_deg']):.0f}°"))
@@ -230,6 +240,7 @@ __WIND__
 <section data-plot="p-bat"><h2>Battery</h2><p class="cap">Voltage (left axis), current (right axis)</p><div id="p-bat" class="plot"></div></section>
 <section data-plot="p-mot"><h2>Motor outputs</h2><p class="cap">SRV1–4 PWM, µs</p><div id="p-mot" class="plot"></div></section>
 <section data-plot="p-vib"><h2>Vibration</h2><p class="cap">m/s²</p><div id="p-vib" class="plot"></div></section>
+<section data-plot="p-gps"><h2>GPS</h2><p class="cap">Fix type (left axis; RTK Fixed ≈ 1–2 cm, RTK Float ≈ 0.2–1 m, DGPS ≈ 0.5–2 m, 3D ≈ 2–5 m) and satellites (right axis)</p><div id="p-gps" class="plot"></div></section>
 <section data-plot="p-ekf"><h2>EKF variances</h2><p class="cap">Dotted line: ArduPilot's default failsafe threshold (0.8)</p><div id="p-ekf" class="plot"></div></section>
 </div>
 <footer>__FOOTER__</footer>
@@ -248,7 +259,8 @@ if(EMBED){document.documentElement.classList.add('embed');
 // Drop panels whose data this log format doesn't have.
 const has=(...ks)=>ks.some(k=>(D[k]||[]).some(v=>v!==null&&v!==0));
 const AVAIL={'p-alt':has('alt'),'p-gs':has('gs','vz'),'p-att':has('roll','pitch'),'p-bat':has('V','I'),'p-mot':has('m1','m2','m3','m4'),
-  'p-vib':has('vx','vy','vzb'),'p-ekf':has('ev','eph','epv','ec'),'p-wind':!!W};
+  'p-vib':has('vx','vy','vzb'),'p-gps':has('fixt'),'p-ekf':has('ev','eph','epv','ec'),'p-wind':!!W};
+const FIXN={0:'No GPS',1:'No fix',2:'2D',3:'3D',4:'DGPS',5:'RTK Float',6:'RTK Fixed',7:'Static',8:'PPP'};
 document.querySelectorAll('section[data-plot]').forEach(s=>{if(!AVAIL[s.dataset.plot])s.remove();});
 const TS=Object.keys(AVAIL).filter(k=>AVAIL[k]);
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -310,6 +322,10 @@ function draw(){
     B({yaxis:axis({title:{text:'V'}}),yaxis2:axis({title:{text:'A'},overlaying:'y',side:'right',showgrid:false,rangemode:'tozero'})}),cfg);
   react('p-mot',[L(D.m1,'SRV1',c1),L(D.m2,'SRV2',c2),L(D.m3,'SRV3',c3),L(D.m4,'SRV4',c4)],B({yaxis:axis({title:{text:'µs'}})}),cfg);
   react('p-vib',[L(D.vx,'X',c1),L(D.vy,'Y',c2),L(D.vzb,'Z',c3)],B({yaxis:axis({title:{text:'m/s²'},rangemode:'tozero'})}),cfg);
+  react('p-gps',[L(D.fixt,'fix type',c1,{line:{color:c1,width:2,shape:'hv'},customdata:D.fixt.map(v=>FIXN[v]||''),hovertemplate:'%{customdata}<extra>fix</extra>'}),
+      L(D.sats,'satellites',c2,{yaxis:'y2',line:{color:c2,width:1}})],
+    B({yaxis:axis({title:{text:'fix'},range:[2.5,6.5],tickvals:[3,4,5,6],ticktext:['3D','DGPS','RTK Float','RTK Fixed']}),
+       yaxis2:axis({title:{text:'sats'},overlaying:'y',side:'right',showgrid:false,rangemode:'tozero'}),margin:{l:80,r:56,t:30,b:36}}),cfg);
   react('p-ekf',[L(D.ev,'velocity',c1),L(D.eph,'pos horiz',c3),L(D.epv,'pos vert',c2),L(D.ec,'compass',c4)],
     B({yaxis:axis({title:{text:'variance'},rangemode:'tozero'}),shapes:base().shapes.concat([{type:'line',xref:'paper',x0:0,x1:1,y0:.8,y1:.8,line:{color:c4,width:1,dash:'dot'}}])}),cfg);
   if(W)react('p-wind',[{x:W.t,y:W.spd,name:'speed',type:'scatter',mode:'lines',line:{color:c1,width:1.3}},
@@ -325,7 +341,7 @@ function hook(){
       else if(ev['xaxis.autorange'])xr=null; else return;
       busy=true;draw();busy=false;});
     el.on('plotly_hover',ev=>{const i=nearest(D.t,ev.points[0].x);
-      let s=`t ${D.t[i].toFixed(2)} s | ${D.local[i]} | ${D.mode[i]} | alt ${D.alt[i]} m | gs ${D.gs[i]} m/s | ${D.V[i]} V ${D.I[i]} A | ${D.mah[i]} mAh | sats ${D.sats[i]} hdop ${D.hdop[i]}`;
+      let s=`t ${D.t[i].toFixed(2)} s | ${D.local[i]} | ${D.mode[i]} | alt ${D.alt[i]} m | gs ${D.gs[i]} m/s | ${D.V[i]} V ${D.I[i]} A | ${D.mah[i]} mAh | ${FIXN[D.fixt[i]]||'GPS'} | sats ${D.sats[i]} hdop ${D.hdop[i]}`;
       if(W&&W.t.length){const j=nearest(W.t,D.t[i]);if(Math.abs(W.t[j]-D.t[i])<1)s+=` | wind ${W.spd[j]} m/s @ ${W.dir[j]}°`;}
       document.getElementById('readout').textContent=s;});
   });

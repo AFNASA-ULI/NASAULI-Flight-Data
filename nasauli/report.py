@@ -50,6 +50,10 @@ def plot_data(df: pd.DataFrame, wind: pd.DataFrame | None) -> dict:
         "sats": _arr(d["gps_sats"], 0), "hdop": _arr(d["gps_hdop"], 2), "fixt": _arr(d["gps_fix_type"], 0),
         "mode": [m if isinstance(m, str) else "—" for m in d["flight_mode"].astype(object)],
     }
+    # Home elevation: alt_msl - alt_rel is constant (to a few cm) once the EKF has a position.
+    both = df[["alt_msl_m", "alt_rel_m"]].dropna()
+    both = both[both["alt_msl_m"] > 1]
+    data["home_msl"] = round(float((both["alt_msl_m"] - both["alt_rel_m"]).median()), 1) if len(both) else None
     w = None
     if wind is not None and len(wind):
         w = {"t": _arr(wind["elapsed_s"], 2), "spd": _arr(wind["wind_speed_m_s"], 1),
@@ -229,7 +233,7 @@ __NOTES__
 <div class="top">
 <section><h2>Ground track</h2><p class="cap">Metres from home, equal scale. Colour is time.</p><div id="p-track" class="plot"></div></section>
 <div class="stack">
-<section data-plot="p-alt"><h2>Relative altitude</h2><div id="p-alt" class="plot"></div></section>
+<section data-plot="p-alt"><h2>Altitude</h2><p class="cap" id="alt-cap">Above takeoff</p><div id="p-alt" class="plot"></div></section>
 <section data-plot="p-gs"><h2>Groundspeed and climb rate</h2><div id="p-gs" class="plot"></div></section>
 </div>
 </div>
@@ -315,7 +319,13 @@ function draw(){
     hoverlabel:{bgcolor:css('--panel'),bordercolor:css('--rule'),font:{color:css('--ink')}}},cfg);
   const X=xr?{range:xr}:{range:[D.t[0],D.t[D.t.length-1]]};
   const B=(ex)=>{const b=base(ex);b.xaxis=Object.assign(b.xaxis,X);return b;};
-  react('p-alt',[L(D.alt,'alt [m]',c1)],B({yaxis:axis({title:{text:'m'},rangemode:'tozero'}),showlegend:false}),cfg);
+  // One line; the right axis is the same height above mean sea level (offset by the home elevation).
+  const av=D.alt.filter(v=>v!==null),alo=Math.min(0,...av),ahi=Math.max(1,...av),pad=(ahi-alo)*0.06,yr=[alo-pad,ahi+pad];
+  const H=D.home_msl,altTr=[L(D.alt,'above takeoff',c1,{customdata:D.alt.map(v=>v===null||H===null?null:(v+H).toFixed(1)),
+      hovertemplate:H===null?'%{y:.1f} m':'%{y:.1f} m above takeoff<br>%{customdata} m MSL<extra></extra>'})];
+  if(H!==null)altTr.push({x:[D.t[0]],y:[yr[0]+H],yaxis:'y2',type:'scatter',mode:'markers',marker:{opacity:0},showlegend:false,hoverinfo:'skip'});
+  react('p-alt',altTr,B({yaxis:axis({title:{text:'m above takeoff'},range:yr}),
+    yaxis2:H===null?undefined:axis({title:{text:'m MSL'},overlaying:'y',side:'right',showgrid:false,range:[yr[0]+H,yr[1]+H],tickformat:'.0f'}),showlegend:false}),cfg);
   react('p-gs',[L(D.gs,'groundspeed',c1),L(D.vz,'climb rate',c2)],B({yaxis:axis({title:{text:'m/s'}})}),cfg);
   react('p-att',[L(D.roll,'roll',c1),L(D.pitch,'pitch',c2)],B({yaxis:axis({title:{text:'deg'}})}),cfg);
   react('p-bat',[L(D.V,'voltage',c1),L(D.I,'current',c4,{yaxis:'y2',line:{color:c4,width:1}})],
@@ -346,6 +356,7 @@ function hook(){
       document.getElementById('readout').textContent=s;});
   });
 }
+if(D.home_msl!==null){const c=document.getElementById('alt-cap');if(c)c.textContent=`Left axis: above takeoff. Right axis: above mean sea level (takeoff at ${D.home_msl.toFixed(0)} m MSL).`;}
 if(window.Plotly){
   draw();hook();
   document.getElementById('reset').addEventListener('click',()=>{xr=null;busy=true;draw();busy=false;});

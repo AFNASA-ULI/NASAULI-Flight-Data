@@ -50,10 +50,6 @@ def plot_data(df: pd.DataFrame, wind: pd.DataFrame | None) -> dict:
         "sats": _arr(d["gps_sats"], 0), "hdop": _arr(d["gps_hdop"], 2), "fixt": _arr(d["gps_fix_type"], 0),
         "mode": [m if isinstance(m, str) else "—" for m in d["flight_mode"].astype(object)],
     }
-    # Home elevation: alt_msl - alt_rel is constant (to a few cm) once the EKF has a position.
-    both = df[["alt_msl_m", "alt_rel_m"]].dropna()
-    both = both[both["alt_msl_m"] > 1]
-    data["home_msl"] = round(float((both["alt_msl_m"] - both["alt_rel_m"]).median()), 1) if len(both) else None
     w = None
     if wind is not None and len(wind):
         w = {"t": _arr(wind["elapsed_s"], 2), "spd": _arr(wind["wind_speed_m_s"], 1),
@@ -107,7 +103,7 @@ def stat_tiles(meta: dict, wind: pd.DataFrame | None) -> list[tuple[str, str, st
     if g.get("fix"):
         main = g["fix"][0] if g["fix"][0]["pct"] >= 50 else max(g["fix"], key=lambda f: f["pct"])
         rest = [f for f in g["fix"] if f is not main]
-        gsub = (f"{main['accuracy']} error · " if main["accuracy"] else "") + f"{main['pct']:.0f}% of flight"
+        gsub = (f"{main['accuracy']} · " if main["accuracy"] else "") + f"{main['pct']:.0f}% of flight"
         if rest:
             gsub += "; " + ", ".join(f"{f['name']} {f['pct']:.0f}%" for f in rest)
         tiles.append(("GPS", main["name"], gsub))
@@ -138,6 +134,13 @@ def _notes_html(checks: list[dict]) -> str:
     summary = (f"Things to check in this log ({n_warn} warning{'s' if n_warn != 1 else ''}, "
                f"{n_info} note{'s' if n_info != 1 else ''})")
     return f'<details class="notes" open>\n<summary>{summary}</summary>\n{items}\n</details>'
+
+
+def _with_home(p: dict, sm: dict) -> dict:
+    g = sm.get("gps") or {}
+    p["D"]["home_msl"] = round(g["home_msl_m"], 1) if g.get("home_msl_m") is not None else None
+    p["D"]["home_src"] = g.get("home_msl_source")
+    return p
 
 
 def title_for(meta: dict) -> str:
@@ -171,7 +174,7 @@ def render(meta: dict, flight: pd.DataFrame, wind: pd.DataFrame | None,
         "__SUB__": sub, "__STATS__": _stats_html(stat_tiles(meta, wind)), "__NOTES__": _notes_html(meta["checks"]),
         "__WIND__": wind_section, "__DOWNLOADS__": dl, "__FOOTER__": footer,
         "__MODES__": json.dumps(sm["modes"], separators=(",", ":")),
-        "__DATA__": json.dumps(plot_data(flight, wind), separators=(",", ":")),
+        "__DATA__": json.dumps(_with_home(plot_data(flight, wind), sm), separators=(",", ":")),
     }.items():
         out = out.replace(k, v)
     return out
@@ -252,7 +255,7 @@ __WIND__
 <section data-plot="p-bat"><h2>Battery</h2><p class="cap">Voltage (left axis), current (right axis)</p><div id="p-bat" class="plot"></div></section>
 <section data-plot="p-mot"><h2>Motor outputs</h2><p class="cap">SRV1–4 PWM, µs</p><div id="p-mot" class="plot"></div></section>
 <section data-plot="p-vib"><h2>Vibration</h2><p class="cap">m/s²</p><div id="p-vib" class="plot"></div></section>
-<section data-plot="p-gps"><h2>GPS</h2><p class="cap">Fix type (left axis; RTK Fixed ≈ 1–2 cm, RTK Float ≈ 0.2–1 m, DGPS ≈ 0.5–2 m, 3D ≈ 2–5 m) and satellites (right axis)</p><div id="p-gps" class="plot"></div></section>
+<section data-plot="p-gps"><h2>GPS</h2><p class="cap">Fix type (left axis; RTK Fixed: cm-level and RTK Float: ~0.2–1 m, both relative to the base; DGPS ~0.5–2 m; 3D ~2–5 m) and satellites (right axis)</p><div id="p-gps" class="plot"></div></section>
 <section data-plot="p-ekf"><h2>EKF variances</h2><p class="cap">Dotted line: ArduPilot's default failsafe threshold (0.8)</p><div id="p-ekf" class="plot"></div></section>
 </div>
 <footer>__FOOTER__</footer>
@@ -376,7 +379,7 @@ function hook(){
       document.getElementById('readout').textContent=s;});
   });
 }
-if(D.home_msl!==null){const c=document.getElementById('alt-cap');if(c)c.textContent=`Left axis: above takeoff. Right axis: above mean sea level (takeoff at ${D.home_msl.toFixed(0)} m MSL).`;}
+if(D.home_msl!==null){const c=document.getElementById('alt-cap');if(c)c.textContent=`Left axis: height above takeoff (EKF, barometer-based). Right axis: the same above mean sea level, with the takeoff elevation (${D.home_msl.toFixed(1)} m) from ${D.home_src||'the EKF'}; absolute elevation is good to a few meters.`;}
 if(window.Plotly){
   draw();hook();
   document.getElementById('reset').addEventListener('click',()=>{xr=null;busy=true;draw();busy=false;});

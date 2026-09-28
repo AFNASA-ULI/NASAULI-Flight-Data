@@ -1,5 +1,5 @@
 {
-  "pipeline_version": "1.2.1",
+  "pipeline_version": "1.3.0",
   "flight_id": "Tarot450_20260925_170514Z",
   "platform": {
     "id": "TAROT_450",
@@ -109,13 +109,13 @@
         {
           "type": 6,
           "name": "RTK Fixed",
-          "accuracy": "~1\u20132 cm",
+          "accuracy": "cm-level vs. base",
           "pct": 92.0
         },
         {
           "type": 5,
           "name": "RTK Float",
-          "accuracy": "~0.2\u20131 m",
+          "accuracy": "~0.2\u20131 m vs. base",
           "pct": 7.0
         },
         {
@@ -124,7 +124,14 @@
           "accuracy": "~0.5\u20132 m",
           "pct": 1.0
         }
-      ]
+      ],
+      "home_msl_m": 2166.08,
+      "home_msl_source": "RTK GPS before takeoff",
+      "baro_minus_rtk_m": {
+        "median": 1.43,
+        "p5": -0.51,
+        "p95": 2.6
+      }
     }
   },
   "checks": [
@@ -166,7 +173,12 @@
     {
       "level": "info",
       "title": "RTK fix not held for the whole flight",
-      "detail": "RTK Fixed (~1\u20132 cm) for 92% of the airborne time; the rest was RTK Float 7% (~0.2\u20131 m); DGPS/SBAS 1% (~0.5\u20132 m). Positions in those stretches are less accurate; the GPS panel shows when."
+      "detail": "RTK Fixed (cm-level vs. base) for 92% of the airborne time; the rest was RTK Float 7% (~0.2\u20131 m vs. base); DGPS/SBAS 1% (~0.5\u20132 m). Positions in those stretches are less accurate; the GPS panel shows when."
+    },
+    {
+      "level": "info",
+      "title": "Barometric altitude differs from RTK height",
+      "detail": "alt_rel_m (EKF, barometer-based) minus the RTK GPS height above takeoff: median +1.4 m, 5\u201395% range -0.5 to +2.6 m in flight. For precise height use gps_alt_m while the fix is RTK Fixed."
     }
   ],
   "home": {
@@ -264,11 +276,11 @@
     },
     "alt_msl_m": {
       "unit": "m",
-      "description": "Altitude above mean sea level (EKF)"
+      "description": "Altitude above mean sea level (EKF; its reference is set at startup and can be off by meters)"
     },
     "alt_rel_m": {
       "unit": "m",
-      "description": "Altitude relative to home (EKF)"
+      "description": "Altitude relative to home (EKF, barometer-based)"
     },
     "vel_n_m_s": {
       "unit": "m/s",
@@ -304,7 +316,7 @@
     },
     "gps_alt_m": {
       "unit": "m",
-      "description": "Altitude MSL (raw GPS)"
+      "description": "Altitude MSL (raw GPS; RTK height when the fix is RTK)"
     },
     "gps_speed_m_s": {
       "unit": "m/s",

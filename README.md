@@ -49,7 +49,11 @@ page. The remaining raw logger columns follow under their original names.
   components' heartbeats.
 - `time_gps_utc` is the logger clock corrected to the autopilot's GPS time. Wind data is matched on it.
   `time_local` is the same instant in Mountain Time (MST/MDT); the website shows Mountain Time throughout.
-- Wind: the sensor's `vector.x` is speed (m/s) and `vector.y` is direction (deg).
+- Wind: the sensor's `vector.x` is speed (m/s) and `vector.y` is direction (deg, where the wind comes from).
+- Accuracy: RTK positions are centimeter-level *relative to the base station* (an Emlid Reach RS2+ that was not
+  on a surveyed point, so absolute coordinates can be off by a few meters). `alt_rel_m` is barometer-based and
+  drifts ~1–2.5 m from the RTK height; use `gps_alt_m` during RTK Fixed for precise height. Details are on the
+  website's *Processed data* page.
 
 ## Log formats
 

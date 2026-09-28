@@ -50,6 +50,8 @@ There is no test suite; validate a change by running `process` on all flights an
 - Generated site pages live only in `_build/`; edit `nasauli/book.py` or `book/`, never the output.
 - Times: data files keep UTC columns plus `time_local`; everything shown to people (site, reports, check
   messages) is Mountain Time via `nasauli/localtime.py` (America/Denver).
+- GPS accuracy wording: RTK is "cm-level vs. base" (base = Reach RS2+, not surveyed; `schema.RTK_BASE`).
+  EKF `alt_rel_m` is barometric; takeoff elevation comes from RTK `gps_alt_m` before takeoff when available.
 - Wind bags whose `.mcap` lacks the MCAP end marker were never closed cleanly (possibly cut short); the site
   and checks flag this.
 - v2 raw logs start with `# key: value` lines ending in `# ---`. Column groups map to MAVLink messages

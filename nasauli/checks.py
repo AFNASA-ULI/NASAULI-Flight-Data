@@ -96,6 +96,33 @@ def gps_summary(df: pd.DataFrame, air: pd.Series) -> dict:
                       for k, v in pct.items()]
     else:
         out["fix"] = []
+    out.update(height_check(df, air))
+    return out
+
+
+def height_check(df: pd.DataFrame, air: pd.Series) -> dict:
+    """Takeoff elevation from RTK (on the ground before takeoff, RTK Fixed) and how far the barometric
+    relative altitude strays from the RTK height in flight."""
+    fixed = df["gps_fix_type"] == 6
+    if not air.any():
+        return {}
+    t0 = df.loc[air, "elapsed_s"].min()
+    pre = fixed & ~air & (df["elapsed_s"] < t0) & (df["groundspeed_m_s"].fillna(0) < 0.3)
+    out: dict = {}
+    if pre.sum() >= 20:
+        home = float((df["gps_alt_m"] - df["alt_rel_m"])[pre].median())
+        out["home_msl_m"] = round(home, 2)
+        out["home_msl_source"] = "RTK GPS before takeoff"
+        err = (df["alt_rel_m"] - (df["gps_alt_m"] - home))[air & fixed]
+        if len(err) >= 20:
+            out["baro_minus_rtk_m"] = {"median": _r(err.median(), 2), "p5": _r(err.quantile(0.05), 2),
+                                       "p95": _r(err.quantile(0.95), 2)}
+    else:
+        both = df[["alt_msl_m", "alt_rel_m"]].dropna()
+        both = both[both["alt_msl_m"] > 1]
+        if len(both):
+            out["home_msl_m"] = round(float((both["alt_msl_m"] - both["alt_rel_m"]).median()), 2)
+            out["home_msl_source"] = "EKF (approximate)"
     return out
 
 
@@ -207,8 +234,16 @@ def run_checks(s: Session, summary: dict) -> list[dict]:
         others = "; ".join(f"{f['name']} {f['pct']:.0f}%" + (f" ({f['accuracy']})" if f["accuracy"] else "")
                            for t, f in fixes.items() if t != 6)
         add("warn" if fixes[6]["pct"] < 90 else "info", "RTK fix not held for the whole flight",
-            f"RTK Fixed (~1–2 cm) for {fixes[6]['pct']:.0f}% of the {summary['gps']['basis']} time; "
+            f"RTK Fixed (cm-level vs. base) for {fixes[6]['pct']:.0f}% of the {summary['gps']['basis']} time; "
             f"the rest was {others}. Positions in those stretches are less accurate; the GPS panel shows when.")
+
+    # --- barometric vs RTK height
+    b = summary.get("gps", {}).get("baro_minus_rtk_m")
+    if b and max(abs(b["p5"]), abs(b["p95"])) >= 0.5:
+        add("info", "Barometric altitude differs from RTK height",
+            f"alt_rel_m (EKF, barometer-based) minus the RTK GPS height above takeoff: median {b['median']:+.1f} m, "
+            f"5–95% range {b['p5']:+.1f} to {b['p95']:+.1f} m in flight. For precise height use gps_alt_m while "
+            "the fix is RTK Fixed.")
 
     # --- EKF / vibration / GPS
     cv = df["ekf_compass_var"].max()

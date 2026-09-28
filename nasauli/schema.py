@@ -32,8 +32,8 @@ FLIGHT_COLUMNS = {
     # fused position (EKF)
     "lat_deg": ("deg", "Latitude (EKF)"),
     "lon_deg": ("deg", "Longitude (EKF)"),
-    "alt_msl_m": ("m", "Altitude above mean sea level (EKF)"),
-    "alt_rel_m": ("m", "Altitude relative to home (EKF)"),
+    "alt_msl_m": ("m", "Altitude above mean sea level (EKF; its reference is set at startup and can be off by meters)"),
+    "alt_rel_m": ("m", "Altitude relative to home (EKF, barometer-based)"),
     "vel_n_m_s": ("m/s", "Velocity north"),
     "vel_e_m_s": ("m/s", "Velocity east"),
     "vel_d_m_s": ("m/s", "Velocity down"),
@@ -43,7 +43,7 @@ FLIGHT_COLUMNS = {
     # raw GPS
     "gps_lat_deg": ("deg", "Latitude (raw GPS)"),
     "gps_lon_deg": ("deg", "Longitude (raw GPS)"),
-    "gps_alt_m": ("m", "Altitude MSL (raw GPS)"),
+    "gps_alt_m": ("m", "Altitude MSL (raw GPS; RTK height when the fix is RTK)"),
     "gps_speed_m_s": ("m/s", "Ground speed (raw GPS)"),
     "gps_course_deg": ("deg", "Course over ground (raw GPS)"),
     "gps_sats": ("-", "Satellites used"),
@@ -98,19 +98,25 @@ FLIGHT_COLUMNS = {
     "ap_wind_speed_z_m_s": ("m/s", "Autopilot wind estimate, vertical speed"),
 }
 
-# MAVLink GPS_FIX_TYPE -> (name, typical horizontal accuracy). The accuracies are rules of thumb for
-# a multirotor in open sky, not guarantees; the actual error also depends on satellites, HDOP and multipath.
+# MAVLink GPS_FIX_TYPE -> (name, typical horizontal accuracy). Rules of thumb for open sky, not guarantees.
+# RTK accuracies are relative to the base station: with a base that is not on a surveyed point, the whole
+# solution can be offset from true coordinates by up to a few meters (the same offset for the whole session).
 GPS_FIX_TYPES = {
     0: ("No GPS", None),
     1: ("No fix", None),
     2: ("2D fix", "> 5 m"),
     3: ("3D fix", "~2–5 m"),
     4: ("DGPS/SBAS", "~0.5–2 m"),
-    5: ("RTK Float", "~0.2–1 m"),
-    6: ("RTK Fixed", "~1–2 cm"),
+    5: ("RTK Float", "~0.2–1 m vs. base"),
+    6: ("RTK Fixed", "cm-level vs. base"),
     7: ("Static", None),
     8: ("PPP", "~0.1 m"),
 }
+
+# How the RTK base station was set up for the flights so far (shown on the website).
+RTK_BASE = ("Emlid Reach RS2+ base station. Its position was not a surveyed point, so RTK positions are "
+            "precise relative to the base (centimeters) but the absolute coordinates can be offset by up to a "
+            "few meters. The offset is the same throughout a session.")
 
 WIND_COLUMNS = {
     "time_utc": ("UTC", "Time the wind-drone computer received the message (ROS bag time)"),

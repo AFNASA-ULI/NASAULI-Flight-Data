@@ -26,7 +26,7 @@ from .pipeline import PROCESSED, load_all_metadata
 from .localtime import LOCAL_LABEL, fmt
 from .platforms import PLATFORMS
 from .report import render, stat_tiles, title_for
-from .schema import FLIGHT_COLUMNS, WIND_COLUMNS
+from .schema import FLIGHT_COLUMNS, RTK_BASE, WIND_COLUMNS
 
 REPO = "https://github.com/AFNASA-ULI/flightdata"
 BRANCH = "main"
@@ -277,6 +277,23 @@ class Book:
                 "## Loading", "", "```python", "import pandas as pd",
                 f'df = pd.read_parquet("{raw_url("processed/Tarot450_20260925_165053Z/flight.parquet")}")',
                 "```", "", "MATLAB: `parquetread(\"flight.parquet\")`. R: `arrow::read_parquet(\"flight.parquet\")`.", "",
+                "## Position and altitude accuracy", "",
+                f"**RTK base.** {RTK_BASE}", "",
+                "**GPS fix types.** `gps_fix_type` records the receiver's solution for every sample, and each flight "
+                "page shows how much of the flight was in each: RTK Fixed is centimeter-level relative to the base, "
+                "RTK Float about 0.2–1 m, DGPS/SBAS about 0.5–2 m, and a plain 3D fix about 2–5 m. These are rules of "
+                "thumb for open sky, and the spec-sheet figures are 50% (CEP) values, not bounds.", "",
+                "**Horizontal position.** `lat_deg`/`lon_deg` (and `north_m`/`east_m`) are the autopilot's EKF "
+                "estimate; `gps_lat_deg`/`gps_lon_deg` are the receiver's own solution. When hovering or on the "
+                "ground the two agree to a few centimeters while the fix is RTK Fixed. At cruise speed they differ by "
+                "1–2 m because the two MAVLink messages are sampled at slightly different times; use the "
+                "`*_rx_UTC` columns when aligning with other sensors.", "",
+                "**Altitude.** `alt_rel_m` is the EKF height above takeoff, which ArduPilot takes from the barometer; "
+                "in these flights it drifts from the RTK height by about 1–2.5 m (each flight's notes give the "
+                "numbers). `alt_msl_m` uses a reference the EKF sets at startup and can be off by several meters. For "
+                "precise height use `gps_alt_m` while the fix is RTK Fixed.", "",
+                "**Timing.** At 9 m/s the drone moves about 45 cm between 20 Hz samples, so time alignment usually "
+                "matters more than the centimeter-level GPS error.", "",
                 "## Flight columns", "", "| Column | Unit | Description |", "|---|---|---|"]
         text += [f"| `{k}` | {esc(u)} | {esc(d)} |" for k, (u, d) in FLIGHT_COLUMNS.items()]
         text += ["", "## Wind columns", "", "| Column | Unit | Description |", "|---|---|---|"]

@@ -1,5 +1,5 @@
 {
-  "pipeline_version": "1.2.1",
+  "pipeline_version": "1.3.0",
   "flight_id": "Tarot450_20260408",
   "platform": {
     "id": "TAROT_450",
@@ -57,7 +57,9 @@
       "basis": "airborne",
       "sats_min": 29.0,
       "hdop_max": null,
-      "fix": []
+      "fix": [],
+      "home_msl_m": 2160.18,
+      "home_msl_source": "EKF (approximate)"
     }
   },
   "checks": [
@@ -214,11 +216,11 @@
     },
     "alt_msl_m": {
       "unit": "m",
-      "description": "Altitude above mean sea level (EKF)"
+      "description": "Altitude above mean sea level (EKF; its reference is set at startup and can be off by meters)"
     },
     "alt_rel_m": {
       "unit": "m",
-      "description": "Altitude relative to home (EKF)"
+      "description": "Altitude relative to home (EKF, barometer-based)"
     },
     "vel_n_m_s": {
       "unit": "m/s",
@@ -254,7 +256,7 @@
     },
     "gps_alt_m": {
       "unit": "m",
-      "description": "Altitude MSL (raw GPS)"
+      "description": "Altitude MSL (raw GPS; RTK height when the fix is RTK)"
     },
     "gps_speed_m_s": {
       "unit": "m/s",
